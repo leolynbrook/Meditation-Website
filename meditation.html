@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <title>ZenBreath</title>
+    <style>
+        :root {
+            --bg: #000000;
+            --fg: #FFFFFF;
+            --success: #66BB6A;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body,
+        html {
+            width: 100%;
+            height: 100dvh;
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .screen.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 8vw, 4rem);
+            font-weight: 200;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+        }
+
+        h2 {
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            font-weight: 300;
+            letter-spacing: 0.05em;
+        }
+
+        .intention-text {
+            font-size: 1.1rem;
+            font-weight: 300;
+            font-style: italic;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 3rem;
+            text-align: center;
+            max-width: 85%;
+            min-height: 3rem;
+            opacity: 0;
+            transition: opacity 1.5s ease;
+        }
+
+        .btn {
+            background: var(--fg);
+            color: var(--bg);
+            border: none;
+            border-radius: 4rem;
+            padding: 1.2rem 3rem;
+            font-size: 1.2rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+            margin-top: auto;
+            margin-bottom: 15vh;
+        }
+
+        .btn:hover {
+            background: #222222;
+            /* Dark grey */
+            color: var(--fg);
+            /* White text */
+        }
+
+        .btn:active {
+            transform: scale(0.9);
+            /* Makes the button reduce in size when clicked */
+        }
+
+        /* Buttery 3D Scroll Picker */
+        .picker-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            height: 50vh;
+            margin: 2rem 0;
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 40%, black 60%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0%, black 40%, black 60%, transparent 100%);
+        }
+
+        .picker {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scroll-snap-type: y mandatory;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+            padding-top: calc(25vh - 70px);
+            padding-bottom: calc(25vh - 70px);
+            perspective: 1000px;
+            transform-style: preserve-3d;
+        }
+
+        .picker::-webkit-scrollbar {
+            display: none;
+        }
+
+        .picker li {
+            height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4.5rem;
+            font-weight: 400;
+            color: var(--fg);
+            scroll-snap-align: center;
+            will-change: transform, opacity;
+        }
+
+        .picker-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60%;
+            height: 140px;
+            pointer-events: all;
+            cursor: pointer;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 1.5rem;
+            border-radius: 0.5rem;
+            transition: background 0.2s;
+        }
+
+        .picker-overlay:active {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        /* Container scales rapidly (GPU Accelerated Breathing) */
+        .circle {
+            width: clamp(250px, 70vw, 500px);
+            height: clamp(250px, 70vw, 500px);
+            border-radius: 50%;
+            background: var(--fg);
+            will-change: transform;
+            transform: scale(0.4);
+            /* Start small for inhale */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes breatheCycle {
+            0% {
+                transform: scale(0.4);
+            }
+
+            /* Start & Hold Low */
+            37.5% {
+                transform: scale(1);
+            }
+
+            /* Inhale (4.5s) */
+            50% {
+                transform: scale(1);
+            }
+
+            /* Hold (1.5s) */
+            87.5% {
+                transform: scale(0.4);
+            }
+
+            /* Exhale (4.5s) */
+            100% {
+                transform: scale(0.4);
+            }
+
+            /* Hold (1.5s) */
+        }
+
+        .animate-breathe {
+            animation: breatheCycle 12s infinite linear;
+        }
+
+        .breathe-text {
+            position: absolute;
+            z-index: 10;
+            font-size: 2.5rem;
+            font-weight: 300;
+            color: var(--fg);
+            mix-blend-mode: difference;
+            transition: opacity 1.5s;
+        }
+
+        .check-svg {
+            position: absolute;
+            width: 40%;
+            height: 40%;
+            opacity: 0;
+            transition: 0.5s 0.8s;
+            z-index: 2;
+        }
+
+        .check-svg.active {
+            opacity: 1;
+        }
+
+        .check-path {
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+        }
+
+        .check-svg.active .check-path {
+            animation: drawCheck 0.6s 1s forwards ease;
+        }
+
+        @keyframes drawCheck {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        .s4-ui {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15vh 0 10vh 0;
+            opacity: 0;
+            pointer-events: none;
+            transition: 0.8s 0.5s;
+        }
+
+        .s4-ui.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        /* --- Streak Button (top-right, all screens) --- */
+        .streak-btn {
+            position: fixed;
+            top: max(env(safe-area-inset-top, 12px), 12px);
+            right: 16px;
+            z-index: 100;
+            background: none;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 2rem;
+            padding: 0.5rem 1rem;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .streak-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.35);
+            color: #fff;
+        }
+
+        .streak-btn:active {
+            transform: scale(0.92);
+        }
+
+        .streak-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* --- Streak Screen --- */
+        .streak-screen {
+            overflow-y: auto;
+            justify-content: flex-start;
+            padding: 6vh 1.5rem 4vh;
+            z-index: 200;
+            /* Fully obscure underlying screens */
+            background-color: var(--bg);
+        }
+
+        .streak-back {
+            position: absolute;
+            top: max(env(safe-area-inset-top, 12px), 12px);
+            left: 16px;
+            background: none;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 2rem;
+            padding: 0.5rem 1rem;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, transform 0.2s;
+            z-index: 10;
+        }
+
+        .streak-back:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .streak-back:active {
+            transform: scale(0.92);
+        }
+
+        .streak-quote {
+            font-size: clamp(1.1rem, 4vw, 1.5rem);
+            font-weight: 300;
+            font-style: italic;
+            color: rgba(255, 255, 255, 0.6);
+            text-align: center;
+            max-width: 85%;
+            margin: 5vh 0 3vh;
+            line-height: 1.6;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+
+        .streak-quote.show {
+            opacity: 1;
+        }
+
+        .streak-counter {
+            text-align: center;
+            margin: 2rem 0 1rem;
+        }
+
+        .streak-number {
+            font-size: clamp(4rem, 15vw, 7rem);
+            font-weight: 200;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            background: linear-gradient(135deg, #66BB6A, #81C784);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .streak-label {
+            font-size: 1rem;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.45);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-top: 0.3rem;
+        }
+
+        /* --- Bar Chart --- */
+        .chart-section {
+            width: 100%;
+            max-width: 500px;
+            margin: 3rem auto 2rem;
+            overflow-x: auto;
+            /* Allow sideways scrolling on tiny phones if needed */
+        }
+
+        .chart-title {
+            font-size: 0.85rem;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.4);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            text-align: center;
+            margin-bottom: 1.2rem;
+        }
+
+        .chart-container {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 4px;
+            height: 160px;
+            padding: 0 0.5rem;
+            min-width: 320px;
+            /* Prevent over-squishing on small widths */
+        }
+
+        .chart-bar-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            max-width: 36px;
+        }
+
+        .chart-bar {
+            width: 100%;
+            min-height: 3px;
+            border-radius: 3px 3px 0 0;
+            background: linear-gradient(180deg, #66BB6A, #388E3C);
+            transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .chart-bar.empty {
+            background: rgba(255, 255, 255, 0.06);
+            min-height: 3px;
+        }
+
+        .chart-bar.today {
+            background: linear-gradient(180deg, #81C784, #66BB6A);
+            box-shadow: 0 0 8px rgba(102, 187, 106, 0.4);
+        }
+
+        .chart-day {
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.3);
+            margin-top: 6px;
+            font-weight: 400;
+        }
+
+        .chart-day.today {
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 600;
+        }
+
+        .chart-mins {
+            font-size: 0.6rem;
+            color: rgba(255, 255, 255, 0.35);
+            margin-bottom: 4px;
+            min-height: 0.9rem;
+        }
+
+        /* ===== TABLET / IPAD (max-width: 1024px) ===== */
+        @media screen and (max-width: 1024px) and (orientation: portrait) {
+            h1 {
+                font-size: clamp(3rem, 10vw, 4rem);
+            }
+
+            h2 {
+                font-size: clamp(2rem, 7vw, 3rem);
+            }
+
+            .intention-text {
+                font-size: 1.3rem;
+                max-width: 90%;
+            }
+
+            .picker-wrapper {
+                height: 45vh;
+            }
+
+            .circle {
+                width: clamp(300px, 75vw, 450px);
+                height: clamp(300px, 75vw, 450px);
+            }
+        }
+
+        /* iPad Landscape / Small Laptops (max-height: 850px) */
+        @media screen and (max-width: 1024px) and (orientation: landscape) and (max-height: 850px) {
+            .btn {
+                margin-bottom: 5vh;
+            }
+
+            .intention-text {
+                margin-bottom: 1.5rem;
+            }
+
+            .picker-wrapper {
+                height: 35vh;
+                margin: 1rem 0;
+            }
+
+            .circle {
+                width: clamp(200px, 60vh, 350px);
+                height: clamp(200px, 60vh, 350px);
+            }
+        }
+
+        /* ===== MOBILE ONLY (phones) ===== */
+        /* Desktop remain completely untouched */
+        @media screen and (max-width: 600px) {
+
+            /* General mobile portrait adjustments covering Samsungs, Pixels, iPhones */
+            h1 {
+                font-size: clamp(2rem, 10vw, 3rem);
+                margin-bottom: 0.8rem;
+            }
+
+            h2 {
+                font-size: clamp(1.3rem, 6vw, 2rem);
+            }
+
+            .intention-text {
+                font-size: 1rem;
+                max-width: 92%;
+                margin-bottom: 2rem;
+                min-height: 2.5rem;
+            }
+
+            /* Bigger tap targets for buttons */
+            .btn {
+                padding: 1.1rem 2.4rem;
+                font-size: 1.1rem;
+                margin-bottom: 8vh;
+                min-height: 52px;
+            }
+
+            /* Picker adjustments */
+            .picker-wrapper {
+                height: 45vh;
+                margin: 1.2rem 0;
+            }
+
+            .picker {
+                padding-top: calc(22.5vh - 55px);
+                padding-bottom: calc(22.5vh - 55px);
+            }
+
+            .picker li {
+                height: 110px;
+                font-size: 3.5rem;
+            }
+
+            .picker-overlay {
+                width: 70%;
+                height: 110px;
+                padding-right: 1rem;
+            }
+
+            /* Breathing circle */
+            .circle {
+                width: clamp(220px, 75vw, 350px);
+                height: clamp(220px, 75vw, 350px);
+            }
+
+            .breathe-text {
+                font-size: 2rem;
+            }
+
+            /* Session complete UI */
+            .s4-ui {
+                padding: 12vh 0 8vh 0;
+            }
+
+            /* Streak button */
+            .streak-btn {
+                top: max(env(safe-area-inset-top, 8px), 8px);
+                right: 12px;
+                padding: 0.45rem 0.8rem;
+                font-size: 0.8rem;
+            }
+
+            .streak-btn svg {
+                width: 14px;
+                height: 14px;
+            }
+
+            /* Streak screen */
+            .streak-screen {
+                padding: 5vh 1rem 3vh;
+            }
+
+            .streak-back {
+                top: max(env(safe-area-inset-top, 8px), 8px);
+                left: 12px;
+                padding: 0.45rem 0.8rem;
+                font-size: 0.8rem;
+            }
+
+            .streak-quote {
+                font-size: clamp(1rem, 4.5vw, 1.3rem);
+                max-width: 92%;
+                margin: 4vh 0 2vh;
+                line-height: 1.5;
+            }
+
+            .streak-number {
+                font-size: clamp(3.5rem, 18vw, 5.5rem);
+            }
+
+            .streak-label {
+                font-size: 0.85rem;
+                letter-spacing: 0.12em;
+            }
+
+            /* Chart adjustments */
+            .chart-section {
+                margin: 2rem auto 1.5rem;
+            }
+
+            .chart-title {
+                font-size: 0.75rem;
+                margin-bottom: 1rem;
+            }
+
+            .chart-container {
+                height: 130px;
+                gap: 3px;
+                padding: 0 0.3rem;
+            }
+
+            .chart-bar-wrap {
+                max-width: 28px;
+            }
+
+            .chart-day {
+                font-size: 0.55rem;
+                margin-top: 4px;
+            }
+
+            .chart-mins {
+                font-size: 0.5rem;
+                min-height: 0.75rem;
+            }
+        }
+
+        /* Very small phones (iPhone SE, Galaxy A series, etc.) */
+        @media screen and (max-width: 375px) {
+            h1 {
+                font-size: clamp(1.8rem, 10vw, 2.5rem);
+            }
+
+            .intention-text {
+                font-size: 0.9rem;
+            }
+
+            .btn {
+                padding: 1rem 2rem;
+                font-size: 1rem;
+                margin-bottom: 6vh;
+            }
+
+            .picker li {
+                height: 95px;
+                font-size: 3rem;
+            }
+
+            .picker-overlay {
+                height: 95px;
+            }
+
+            .picker {
+                padding-top: calc(22.5vh - 47px);
+                padding-bottom: calc(22.5vh - 47px);
+            }
+
+            .circle {
+                width: clamp(200px, 78vw, 300px);
+                height: clamp(200px, 78vw, 300px);
+            }
+
+            .breathe-text {
+                font-size: 1.7rem;
+            }
+
+            .streak-number {
+                font-size: clamp(3rem, 20vw, 4.5rem);
+            }
+
+            .chart-container {
+                height: 110px;
+                gap: 2px;
+            }
+        }
+
+        /* ===== MOBILE LANDSCAPE (Phones and smaller layout devices) ===== */
+        /* Targets landscape orientation on small/medium height screens (iPhones, Samsungs, Pixels) */
+        @media screen and (max-height: 500px) and (orientation: landscape) {
+
+            /* General container */
+            .screen {
+                justify-content: center;
+            }
+
+            /* Home Screen */
+            h1 {
+                margin-top: 10vh !important;
+                font-size: clamp(1.5rem, 6vh, 2.5rem);
+                margin-bottom: 0.5rem;
+            }
+
+            h2 {
+                margin-top: 2vh !important;
+                font-size: clamp(1.2rem, 5vh, 2rem);
+            }
+
+            .intention-text {
+                font-size: 0.9rem;
+                margin-bottom: 0.5rem;
+                min-height: 1.5rem;
+                max-width: 90%;
+            }
+
+            .btn {
+                padding: 0.8rem 2rem;
+                font-size: 1rem;
+                margin-bottom: 8vh;
+                margin-top: 0.5rem;
+                min-height: 44px;
+            }
+
+            /* Picker adjustments for Landscape */
+            .picker-wrapper {
+                height: 40vh;
+                margin: 0.5rem 0;
+            }
+
+            .picker li {
+                height: 70px;
+                font-size: 2.5rem;
+            }
+
+            .picker-overlay {
+                height: 70px;
+                width: 50%;
+            }
+
+            .picker {
+                padding-top: calc(20vh - 35px);
+                padding-bottom: calc(20vh - 35px);
+            }
+
+            /* Breathing circle for Landscape */
+            .circle {
+                width: clamp(150px, 60vh, 250px);
+                height: clamp(150px, 60vh, 250px);
+            }
+
+            .breathe-text {
+                font-size: 1.5rem;
+            }
+
+            /* Session complete UI */
+            .s4-ui {
+                padding: 10vh 0 5vh 0;
+            }
+
+            /* Streak Screen adjustments for Landscape */
+            .streak-screen {
+                padding: 10vh 1rem 2vh;
+            }
+
+            .streak-counter {
+                margin: 0.5rem 0;
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: center;
+                gap: 1rem;
+            }
+
+            .streak-number {
+                font-size: clamp(3rem, 15vh, 4.5rem);
+            }
+
+            .streak-quote {
+                margin: 1vh auto;
+                font-size: 0.9rem;
+                max-width: 80%;
+            }
+
+            .chart-section {
+                margin: 1rem auto;
+            }
+
+            .chart-container {
+                height: 90px;
+            }
+
+            .chart-title {
+                margin-bottom: 0.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Streak button (visible on all screens) -->
+    <button class="streak-btn" id="streakBtn" onclick="openStreak()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+        </svg>
+        <span id="streakBtnLabel">0</span>
+    </button>
+
+    <div id="s1" class="screen active">
+        <h1 style="margin-top: 20vh;">ZenBreath</h1>
+        <div id="dailyIntention" class="intention-text"></div>
+        <button class="btn" onclick="nav('s2')">Start Breathing</button>
+    </div>
+
+    <div id="s2" class="screen">
+        <h2 style="margin-top: 5vh;">Select Duration</h2>
+        <div class="picker-wrapper">
+            <div id="pickerOverlay" class="picker-overlay" onclick="startSession()">
+                <span style="opacity:0.5">min</span>
+            </div>
+            <ul id="picker" class="picker"></ul>
+        </div>
+        <button class="btn" onclick="startSession()">Begin</button>
+    </div>
+
+    <div id="s34" class="screen">
+        <div id="mainCircle" class="circle">
+            <svg id="checkSvg" class="check-svg" viewBox="0 0 52 52">
+                <path class="check-path" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"
+                    d="M14 27 l 8 8 l 16 -16" />
+            </svg>
+        </div>
+        <div id="breatheText" class="breathe-text">Inhale</div>
+        <div id="s4UI" class="s4-ui">
+            <h2>Session Complete</h2>
+            <button class="btn" onclick="resetToHome()">Home</button>
+        </div>
+    </div>
+
+    <!-- Streak Screen -->
+    <div id="streakScreen" class="screen streak-screen">
+        <button class="streak-back" onclick="closeStreak()">&larr; Back</button>
+        <div class="streak-quote" id="streakQuote"></div>
+        <div class="streak-counter">
+            <div class="streak-number" id="streakNumber">0</div>
+            <div class="streak-label">day streak</div>
+        </div>
+        <div class="chart-section">
+            <div class="chart-title">Last 14 Days</div>
+            <div class="chart-container" id="streakChart"></div>
+        </div>
+    </div>
+
+    <script>
+        const picker = document.getElementById('picker');
+        const mainCircle = document.getElementById('mainCircle');
+        const breatheText = document.getElementById('breatheText');
+
+        let selectedDurationMs = 60000;
+        let isSessionActive = false;
+        let itemHeight = 0;
+        let lastIndex = -1;
+
+        /* --- 16,000 Intentions Generator (Grammatically Vetted) --- */
+        const intentions = (() => {
+            const list = [];
+
+            // Pool 1: Presence (Transitive & Prepositional Focus Verbs + Tranquil Nouns)
+            const p1V = ["Focus on", "Embrace", "Notice", "Accept", "Connect with", "Find peace in", "Bring awareness to", "Settle into", "Return to", "Rest in", "Center yourself in", "Welcome", "Observe", "Acknowledge", "Surrender to", "Sink into", "Tune into", "Be present with", "Ground yourself in", "Anchor your mind in"];
+            const p1N = ["the present moment", "the stillness within", "your natural breath", "the here and now", "the quiet of this space", "your inner calm", "this exact second", "the feeling of peace", "the silence around you", "the simplicity of now", "your own rhythm", "this fleeting moment", "the space between thoughts", "the gentle flow of time", "the depth of now", "your current state of being", "the surrounding calm", "the clarity within", "the unseen energy of today", "the reality of this breath"];
+            const p1E = [".", ". Let it be.", ". There is no rush.", ". You are safe here.", ". All is well.", ". Let it anchor you.", ". Notice how it feels.", ". Embrace it fully.", ". Breathe deeply.", ". Find comfort in this."];
+            for (let v of p1V) for (let n of p1N) for (let e of p1E) list.push(`${v} ${n}${e}`);
+
+            // Pool 2: Release (Action Verbs + Heavy/Negative Nouns)
+            const p2V = ["Let go of", "Release", "Exhale", "Breathe out", "Free yourself from", "Soften around", "Unclench from", "Melt away", "Shed", "Clear away", "Dissolve", "Wash away", "Detach from", "Unwind from", "Ease away", "Step back from", "Let fade", "Banish", "Surrender", "Cast away"];
+            const p2N = ["the day's tension", "any lingering stress", "your immediate worries", "the weight on your shoulders", "feelings of restlessness", "the day's heavy burdens", "physical tightness", "shadows of the past", "anxieties about the future", "heavy thoughts", "what you cannot control", "unnecessary mental clutter", "the outside noise", "rigid expectations", "internal resistance", "seeds of doubt", "lingering fear", "the urge to rush", "harsh self-judgments", "the need to fix everything"];
+            const p2E = [".", ". Find your center.", ". Allow peace in.", ". Return to now.", ". Feel the lightness.", ". Let it pass.", ". Watch it fade.", ". You are free.", ". Soften your gaze.", ". Release completely."];
+            for (let v of p2V) for (let n of p2N) for (let e of p2E) list.push(`${v} ${n}${e}`);
+
+            // Pool 3: Gratitude (Appreciation Verbs + Positive/Growth Nouns)
+            const p3V = ["Cultivate", "Nurture", "Appreciate", "Give space to", "Make peace with", "Hold space for", "Awaken to", "Listen to", "Invite in", "Open your heart to", "Reflect on", "Honor", "Respect", "Witness", "Hold compassion for", "Breathe life into", "Send kindness to", "Radiate peace toward", "Discover", "Explore"];
+            const p3N = ["the simple gift of today", "your inner resilience", "the changing seasons of life", "life's natural ebbs and flows", "your inner child", "the journey ahead of you", "your daily personal growth", "the gentle process of healing", "the rhythm of your heartbeat", "the beauty of the unknown", "the paths you have walked", "the world surrounding you", "your resilient physical body", "the quiet thoughts that arise", "the positive energy within", "the light shining around you", "your deepest, truest self", "the interconnectedness of all", "your own quiet strength", "the profound beauty of now"];
+            const p3E = [".", ". Let it guide you.", ". Trust the process.", ". Let it unfold naturally.", ". You are where you need to be.", ". No judgment needed.", ". Allow it to simply be.", ". Hold it gently in your mind.", ". See it clearly.", ". Feel its presence."];
+            for (let v of p3V) for (let n of p3N) for (let e of p3E) list.push(`${v} ${n}${e}`);
+
+            // Pool 4: Balance (Alignment Verbs + Spatial/State Nouns)
+            const p4V = ["Find balance in", "Ground yourself amidst", "Stay open to", "Yield softly to", "Navigate", "Flow gently with", "Settle your mind around", "Breathe softly into", "Look gently at", "Observe the nature of", "Align with", "Harmonize with", "Embody", "Radiate", "Channel", "Direct your love to", "Find quiet strength in", "Uncover", "Embrace the journey of", "Allow time for"];
+            const p4N = ["the subtle shifts of life", "your true, authentic nature", "the quiet wisdom within", "the peaceful space around you", "infinite new possibilities", "the stillness beneath the surface", "your steady, unchanging core", "the gentle breeze of change", "the unfolding path ahead", "your higher, wiser self", "the present, grounding reality", "the hidden joy in small things", "the slow, deliberate moments", "the calm center of your mind", "your natural, effortless balance", "the peaceful, quiet void", "the living, breathing moment", "the grounding energy of earth", "the open, expansive sky", "the natural tide of your breath"];
+            const p4E = [".", ". Step smoothly into it.", ". Rest safely right here.", ". Let it wash over you.", ". It is more than enough.", ". You are enough as you are.", ". Simply observe without reacting.", ". Let go of everything else.", ". Breathe deeply into it.", ". Stay a while in this feeling."];
+            for (let v of p4V) for (let n of p4N) for (let e of p4E) list.push(`${v} ${n}${e}`);
+
+            return list;
+        })();
+
+        /* --- 10,000+ Motivational Quotes Generator (Non-AI, Combinatorial) --- */
+        const motivQuotes = (() => {
+            const q = [];
+            // Pattern 1: "[Affirmation]. [Encouragement]." (50 × 50 = 2,500)
+            const a1 = ["You're doing great", "You showed up today", "You chose yourself", "You're making progress", "You're stronger than you think", "You're exactly where you need to be", "You matter more than you know", "You're building something real", "You've already come so far", "You're braver than you believe", "Your effort is paying off", "You're growing every single day", "You handled today well", "You're more capable than you realize", "You didn't give up", "You're on the right path", "You took a step forward", "You chose peace today", "You showed real courage", "You're doing better than you think", "Your heart is in the right place", "You're learning and that's enough", "You kept going when it was hard", "You found the strength to try", "You are worthy of this moment", "You gave it your best", "You stayed true to yourself", "You're creating positive change", "You made a difference today", "You honored your own needs", "You rose above the noise", "You showed up with intention", "You're healing at your own pace", "You turned a hard day around", "You chose kindness for yourself", "You've earned this quiet moment", "You're writing your own story", "You pushed through the doubt", "You trusted the process", "You proved something to yourself", "You took care of your mind", "You prioritized your peace", "You're becoming who you're meant to be", "You let go of what didn't serve you", "You found stillness in the chaos", "You showed patience with yourself", "You've grown more than you see", "You made space for calm", "You invested in yourself", "You chose to breathe"];
+            const e1 = ["Keep going", "Every step counts", "Tomorrow will thank you", "This is what strength looks like", "Be proud of that", "The world needs your light", "That takes real courage", "Small steps lead to big changes", "You're proof that trying matters", "Give yourself credit", "Celebrate this victory", "Your consistency is powerful", "Trust your journey", "This moment matters", "Let that sink in", "You deserve to feel this good", "Remember how far you've come", "The hard days make you stronger", "You're planting seeds of change", "Breathe and believe", "Your future self will thank you", "This is your time to shine", "Nothing can take this from you", "You are unstoppable", "Stay on this path", "The best is still ahead", "Hold your head high", "You're inspiring others without knowing it", "Quiet progress is still progress", "Believe in your own rhythm", "You're building unshakable peace", "One breath at a time", "Your presence here proves your strength", "Let yourself feel proud", "The calm you feel is real", "You're choosing a better life", "Never underestimate your will", "Every session adds up", "You're rewriting your habits", "Peace is your superpower", "You showed up and that's everything", "Growth looks good on you", "Your mind is getting sharper", "Stillness is strength", "You're mastering your own mind", "This dedication is rare", "You're a force of nature", "Discipline is self-love", "Keep nurturing this version of you", "You belong in this calm"];
+            for (let a of a1) for (let e of e1) q.push(`${a}. ${e}.`);
+
+            // Pattern 2: "[Celebration]! [Wisdom]." (50 × 50 = 2,500)
+            const c2 = ["Amazing work", "Look at you go", "What a journey", "Incredible effort", "Well done", "Fantastic commitment", "You're thriving", "Beautiful progress", "Powerful choice", "Outstanding dedication", "Impressive streak", "Remarkable resilience", "Brilliant consistency", "Wonderful discipline", "Stunning growth", "Admirable focus", "Exceptional strength", "Magnificent perseverance", "Extraordinary will", "Phenomenal energy", "Unstoppable momentum", "Genuine bravery", "Real dedication", "True grit", "Pure determination", "Absolute commitment", "Solid progress", "Steady growth", "Undeniable strength", "Quiet power", "Deep resilience", "Natural talent", "Inner fire", "Bold move", "Great instinct", "Strong foundation", "Clear vision", "Sharp focus", "Calm courage", "Brave heart", "Wise choice", "Kind soul", "Warm spirit", "Bright energy", "Fresh start", "New chapter", "Open mind", "Full presence", "Sweet victory", "Proud moment"];
+            const w2 = ["Every breath you take builds inner peace", "Consistency is the bridge to transformation", "Small moments of calm create lasting change", "Peace of mind is the greatest wealth", "The quietest minds often hold the deepest strength", "Patience with yourself is the first act of kindness", "Real growth happens in the silence", "Your breath is always there to bring you home", "Showing up is half the battle won", "Calm is a skill you're perfecting daily", "What you practice today shapes who you become", "Stillness teaches what noise never can", "A peaceful mind opens a thousand doors", "You don't need to be perfect to be powerful", "Rest and progress are not opposites", "Healing is not linear but it is always forward", "Every moment of mindfulness is a gift to yourself", "The present moment is the only one that truly exists", "Your commitment to yourself is the most important one", "Strength isn't always loud; sometimes it's a deep breath", "What you nurture in silence blooms in your life", "The journey inward is the most rewarding one", "Choosing calm is an act of rebellion against chaos", "You are not behind; you are on your own timeline", "A single mindful minute can shift your entire day", "The peace you're building is unbreakable", "Your dedication to growth is extraordinary", "Meditation is a conversation with your best self", "You're training your mind like an athlete trains their body", "In the stillness, you find your true strength", "Every session is an investment in your well-being", "The discipline to be still is the rarest kind", "You're creating a sanctuary inside your own mind", "The calm you cultivate now will carry you through storms", "Mindfulness is the art of coming home to yourself", "You're proving that inner peace is a choice", "The greatest journey is the one within", "Self-care isn't selfish; it's essential", "You're becoming the calm in your own storm", "Breathing with intention changes everything", "The stillness you practice echoes in all you do", "You are the author of your own peace", "Every exhale releases what no longer serves you", "Your consistency speaks volumes about your character", "The world gets better when you take care of yourself", "Presence is the most powerful gift you can give", "You're building a life rooted in awareness", "In your stillness, the universe moves for you", "Each breath is a fresh beginning", "Peace is not found; it is created by you"];
+            for (let c of c2) for (let w of w2) q.push(`${c}! ${w}.`);
+
+            // Pattern 3: "Remember: [truth]. [affirmation]." (50 × 50 = 2,500)
+            const t3 = ["you are enough just as you are", "progress is not always visible", "rest is a form of strength", "your best is always enough", "difficult roads lead to beautiful places", "the storm always passes", "you've survived every hard day so far", "there's no wrong pace for healing", "you carry more light than you know", "your journey is yours alone", "peace begins with a single breath", "not every day has to be perfect", "showing up is an act of courage", "vulnerability is not weakness", "you are not your anxious thoughts", "growth comes in waves", "small wins build mighty victories", "you deserve the peace you give others", "it's okay to start over", "your worth is not tied to productivity", "kindness to yourself is never wasted", "silence can be the loudest healer", "you are more than your worst day", "every ending holds a new beginning", "comparison steals nothing but your joy", "the hardest battles are fought within", "your potential is limitless", "you are allowed to take up space", "imperfection is perfectly human", "the present is a gift", "there is strength in letting go", "your feelings are always valid", "no one can walk your path for you", "you were built for this", "the darkest nights produce the brightest stars", "there is magic in starting again", "you have permission to rest", "growth doesn't always feel comfortable", "your awareness is your greatest tool", "the only way out is through", "you are the calm you've been seeking", "there is no finish line for self-improvement", "every setback is a setup for a comeback", "your breath is your anchor", "peace is power in its purest form", "the mind you train today protects you tomorrow", "gentleness is the ultimate strength", "you don't have to carry everything at once", "the light within you outshines any darkness", "every moment of presence is a meditation"];
+            const af3 = ["You've got this", "Keep believing in yourself", "Never forget your worth", "Stay gentle with yourself", "Let that truth guide you", "Carry that with you today", "Hold onto that", "Breathe that in deeply", "Let it fuel your fire", "You are living proof of that", "Own that truth", "Stand tall in that knowledge", "Let it settle in your bones", "Trust yourself completely", "You know this in your heart", "Let that be your compass", "Walk forward with confidence", "Wear that truth proudly", "Feel it in every breath", "Let it light your way", "Nothing can dim that", "Take strength from that", "That's your foundation", "Build on that every day", "Anchor yourself in that", "Rise with that knowledge", "Shine with that awareness", "Grow from that understanding", "Move forward with that wisdom", "Be at peace with that", "Honor that in yourself", "Celebrate that quietly", "Hold that close", "Nurture that truth daily", "Return to that when in doubt", "That is your power", "That's what makes you remarkable", "Let that set you free", "Embrace every part of that", "Find comfort in knowing that", "Stay rooted in that belief", "Keep that fire burning", "Channel that energy forward", "That's your story to tell", "Be proud of knowing that", "That wisdom runs deep in you", "Let that lift you up", "Carry that like armor", "That's the real you speaking", "That changes everything"];
+            for (let t of t3) for (let a of af3) q.push(`Remember: ${t}. ${a}.`);
+
+            // Pattern 4: "[Verb] your [quality]. [Reward]." (50 × 50 = 2,500)
+            const v4 = ["Celebrate", "Honor", "Protect", "Nurture", "Strengthen", "Trust", "Acknowledge", "Embrace", "Respect", "Amplify", "Fuel", "Guard", "Channel", "Treasure", "Cultivate", "Savor", "Cherish", "Unleash", "Harness", "Reclaim", "Deepen", "Sharpen", "Polish", "Refine", "Elevate", "Enrich", "Expand", "Fortify", "Nourish", "Sustain", "Value", "Appreciate", "Develop", "Explore", "Ignite", "Awaken", "Restore", "Revive", "Renew", "Liberate", "Empower", "Charge", "Activate", "Unlock", "Discover", "Reveal", "Release", "Accept", "Welcome", "Own"];
+            const q4 = ["inner peace", "quiet strength", "gentle courage", "daily progress", "mindful nature", "patient spirit", "calm energy", "steady growth", "deep focus", "resilient heart", "warm compassion", "fierce determination", "brilliant awareness", "natural rhythm", "authentic power", "unwavering commitment", "peaceful intention", "grounded presence", "creative spirit", "balanced mind", "fierce kindness", "boundless potential", "healing journey", "still center", "bright clarity", "wild hope", "sacred space", "brave vulnerability", "honest reflection", "relentless optimism", "tender self-care", "bold authenticity", "quiet confidence", "humble wisdom", "steadfast patience", "joyful discipline", "raw honesty", "unconditional worth", "glowing vitality", "renewed purpose", "unshakable faith", "deep gratitude", "soft power", "true resilience", "open curiosity", "radical acceptance", "boundless love", "effortless grace", "clear intention", "magnetic calm"];
+            const r4 = ["It will carry you through anything", "It's your greatest asset", "The world responds to it", "It makes you unstoppable", "It's already changing your life", "It grows stronger with every breath", "Others notice it even when you don't", "It sets you apart", "It's the source of your power", "It heals everything it touches", "It opens doors you can't yet see", "It inspires more than you know", "It's a gift only you possess", "It's the foundation of everything good", "It shines brighter every day", "It transforms challenges into growth", "It's what makes you extraordinary", "It attracts the right things to you", "It deepens with every session", "It protects you in ways you can't imagine", "It brings clarity to confusion", "It turns doubt into confidence", "It makes you magnetic", "It shows in everything you do", "It's the key to your happiness", "It fuels your greatest achievements", "It creates ripples of change around you", "It calms every storm you face", "It's your secret weapon", "It only gets stronger from here", "It defines your best self", "It lights the path ahead", "It makes every day better", "It's the reason you're here", "It anchors you when things get tough", "It's already working for you", "It multiplies when you share it", "It never runs out", "It's been there all along", "It surprises you with its depth", "It connects you to something greater", "It makes the impossible feel possible", "It's your north star", "It holds the answers you seek", "It grows every time you practice", "It's the calm within the storm", "It reminds you who you really are", "It lifts everyone around you", "It keeps you centered", "It's proof of your dedication"];
+            for (let v of v4) for (let qv of q4) for (let r of r4) { if (q.length < 10000) q.push(`${v} your ${qv}. ${r}.`); }
+
+            return q;
+        })();
+
+        /* --- Streak Tracking (localStorage) --- */
+        function getSessionLog() {
+            try { return JSON.parse(localStorage.getItem('zen_sessions') || '[]'); } catch (e) { return []; }
+        }
+        function logSession(durationMin) {
+            const log = getSessionLog();
+            log.push({ date: new Date().toISOString().slice(0, 10), mins: durationMin });
+            try { localStorage.setItem('zen_sessions', JSON.stringify(log)); } catch (e) { }
+        }
+        function calcStreak() {
+            const log = getSessionLog();
+            const uniqueDays = [...new Set(log.map(s => s.date))].sort().reverse();
+            if (uniqueDays.length === 0) return 0;
+            const today = new Date().toISOString().slice(0, 10);
+            const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+            // Streak must include today or yesterday
+            if (uniqueDays[0] !== today && uniqueDays[0] !== yesterday) return 0;
+            let streak = 1;
+            for (let i = 0; i < uniqueDays.length - 1; i++) {
+                const cur = new Date(uniqueDays[i]);
+                const prev = new Date(uniqueDays[i + 1]);
+                const diff = (cur - prev) / 86400000;
+                if (diff === 1) streak++;
+                else break;
+            }
+            return streak;
+        }
+        function getLast14Days() {
+            const log = getSessionLog();
+            const days = [];
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            for (let i = 13; i >= 0; i--) {
+                const d = new Date(Date.now() - i * 86400000);
+                const key = d.toISOString().slice(0, 10);
+                const mins = log.filter(s => s.date === key).reduce((sum, s) => sum + s.mins, 0);
+                days.push({ key, label: dayNames[d.getDay()], mins, isToday: i === 0 });
+            }
+            return days;
+        }
+
+        function updateStreakBtn() {
+            document.getElementById('streakBtnLabel').textContent = calcStreak();
+        }
+
+        let previousScreen = 's1';
+        function openStreak() {
+            // Remember which screen was active
+            const activeScreen = document.querySelector('.screen.active');
+            if (activeScreen && activeScreen.id !== 'streakScreen') previousScreen = activeScreen.id;
+            nav('streakScreen');
+            document.getElementById('streakBtn').style.display = 'none';
+            renderStreakScreen();
+        }
+        function closeStreak() {
+            nav(previousScreen);
+            // Only show streak button if we aren't returning to an active breathing session
+            if (previousScreen !== 's34') {
+                document.getElementById('streakBtn').style.display = '';
+            }
+        }
+
+        function renderStreakScreen() {
+            // Quote (non-repeating)
+            const quoteEl = document.getElementById('streakQuote');
+            let seenQ = [];
+            try { seenQ = JSON.parse(localStorage.getItem('zen_seen_q') || '[]'); } catch (e) { }
+            if (seenQ.length >= motivQuotes.length) seenQ = [];
+            const availQ = motivQuotes.map((_, i) => i).filter(i => !seenQ.includes(i));
+            const qIdx = availQ[Math.floor(Math.random() * availQ.length)];
+            quoteEl.textContent = `"${motivQuotes[qIdx]}"`;
+            seenQ.push(qIdx);
+            try { localStorage.setItem('zen_seen_q', JSON.stringify(seenQ)); } catch (e) { }
+            setTimeout(() => quoteEl.classList.add('show'), 100);
+
+            // Streak number
+            const streak = calcStreak();
+            document.getElementById('streakNumber').textContent = streak;
+
+            // Chart
+            const chart = document.getElementById('streakChart');
+            chart.innerHTML = '';
+            const days = getLast14Days();
+            const maxMins = Math.max(1, ...days.map(d => d.mins));
+            days.forEach(d => {
+                const wrap = document.createElement('div');
+                wrap.className = 'chart-bar-wrap';
+                const minsLabel = document.createElement('div');
+                minsLabel.className = 'chart-mins';
+                minsLabel.textContent = d.mins > 0 ? d.mins + 'm' : '';
+                const bar = document.createElement('div');
+                bar.className = 'chart-bar' + (d.mins === 0 ? ' empty' : '') + (d.isToday ? ' today' : '');
+                bar.style.height = '3px';
+                const label = document.createElement('div');
+                label.className = 'chart-day' + (d.isToday ? ' today' : '');
+                label.textContent = d.isToday ? 'Today' : d.label;
+                wrap.appendChild(minsLabel);
+                wrap.appendChild(bar);
+                wrap.appendChild(label);
+                chart.appendChild(wrap);
+                // Animate bar height
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        bar.style.height = d.mins > 0 ? Math.max(8, (d.mins / maxMins) * 140) + 'px' : '3px';
+                    });
+                });
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const intentionEl = document.getElementById('dailyIntention');
+            let seen = [];
+            try { seen = JSON.parse(localStorage.getItem('zen_seen') || '[]'); } catch (e) { }
+            if (seen.length >= intentions.length) seen = [];
+            let available = intentions.map((_, i) => i).filter(i => !seen.includes(i));
+            const randomIdx = available[Math.floor(Math.random() * available.length)];
+            intentionEl.textContent = `"${intentions[randomIdx]}"`;
+            seen.push(randomIdx);
+            try { localStorage.setItem('zen_seen', JSON.stringify(seen)); } catch (e) { }
+            setTimeout(() => intentionEl.style.opacity = '1', 150);
+
+            for (let i = 1; i <= 30; i++) {
+                let li = document.createElement('li');
+                li.textContent = String(i).padStart(2, '0');
+                picker.appendChild(li);
+            }
+            requestAnimationFrame(updateScrollVisuals);
+        });
+
+        function nav(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function updateScrollVisuals() {
+            if (!itemHeight) itemHeight = picker.children[0].offsetHeight;
+            const scrollY = picker.scrollTop;
+            const center = picker.clientHeight / 2;
+            let centerIdx = 0;
+            let minDiv = Infinity;
+
+            Array.from(picker.children).forEach((li, i) => {
+                const dist = (li.offsetTop - scrollY + itemHeight / 2) - center;
+                const norm = dist / itemHeight;
+                if (Math.abs(dist) < minDiv) { minDiv = Math.abs(dist); centerIdx = i; }
+                li.style.transform = `rotateX(${norm * -30}deg) scale(${Math.max(0.4, 1 - Math.abs(norm) * 0.2)}) translateZ(0)`;
+                li.style.opacity = Math.max(0.1, 1 - Math.abs(norm) * 0.6);
+            });
+
+            if (centerIdx !== lastIndex) {
+                if (navigator.vibrate) navigator.vibrate(10);
+                lastIndex = centerIdx;
+                selectedDurationMs = (centerIdx + 1) * 60000;
+            }
+        }
+
+        picker.addEventListener('scroll', () => requestAnimationFrame(updateScrollVisuals), { passive: true });
+
+        let arrowScrolling = false;
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (document.getElementById('s1').classList.contains('active')) {
+                    nav('s2');
+                } else if (document.getElementById('s2').classList.contains('active')) {
+                    startSession();
+                }
+                return;
+            }
+
+            if (!document.getElementById('s2').classList.contains('active')) return;
+
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (arrowScrolling) return; // skip while a scroll is still settling
+                arrowScrolling = true;
+                const dir = e.key === 'ArrowUp' ? -1 : 1;
+                // Use instant scroll for held keys (repeat), smooth for single taps
+                const mode = e.repeat ? 'instant' : 'smooth';
+                picker.scrollBy({ top: dir * itemHeight, behavior: mode });
+                // Release lock after the item has had time to snap
+                setTimeout(() => { arrowScrolling = false; }, e.repeat ? 80 : 200);
+            }
+        });
+
+        async function startSession() {
+            nav('s34');
+            isSessionActive = true;
+            document.getElementById('streakBtn').style.display = 'none';
+
+            mainCircle.style.transform = 'scale(0.4)';
+            breatheText.style.opacity = '1';
+
+            const start = performance.now();
+            mainCircle.classList.add('animate-breathe');
+
+            let textFaded = false;
+            function loop(now) {
+                // Return immediately if session was ended OR if user navigated away from s34
+                if (!isSessionActive || !document.getElementById('s34').classList.contains('active')) return;
+
+                const elapsed = now - start;
+                const p = elapsed % 12000;
+
+                if (!textFaded && elapsed < 26000) {
+                    if (p < 4500) breatheText.textContent = "Inhale";
+                    else if (p < 6000) breatheText.textContent = "Hold";
+                    else if (p < 10500) breatheText.textContent = "Exhale";
+                    else breatheText.textContent = "Hold";
+                } else if (!textFaded) {
+                    breatheText.style.opacity = '0';
+                    textFaded = true;
+                }
+
+                if (elapsed >= selectedDurationMs) endSession();
+                else requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+        }
+
+        function endSession() {
+            isSessionActive = false;
+
+            // Log the completed session
+            logSession(Math.round(selectedDurationMs / 60000));
+            updateStreakBtn();
+
+            // Trap bounding container scale
+            const transform = window.getComputedStyle(mainCircle).transform;
+            mainCircle.classList.remove('animate-breathe');
+            mainCircle.style.transform = transform;
+            void mainCircle.offsetWidth; // Force Reflow
+
+            // Shrink entire container and turn green
+            mainCircle.style.transition = '1.2s ease, background-color 1.2s ease';
+            mainCircle.style.transform = 'scale(0.5)';
+            mainCircle.style.backgroundColor = 'var(--success)';
+
+            breatheText.style.opacity = '0';
+            document.getElementById('checkSvg').classList.add('active');
+            document.getElementById('s4UI').classList.add('active');
+        }
+
+        function resetToHome() { location.reload(); }
+
+        // Initialize streak button count on load
+        updateStreakBtn();
+
+    </script>
+</body>
+
+</html>
