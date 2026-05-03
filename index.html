@@ -275,6 +275,87 @@
             pointer-events: all;
         }
 
+        /* --- Quotes Button (top-left, all screens) --- */
+        .quotes-btn {
+            position: fixed;
+            top: max(env(safe-area-inset-top, 12px), 12px);
+            left: 16px;
+            z-index: 100;
+            background: none;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 2rem;
+            padding: 0.5rem 1rem;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
+            display: flex;
+            align-items: center;
+        }
+
+        .quotes-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.35);
+            color: #fff;
+        }
+
+        .quotes-btn:active {
+            transform: scale(0.92);
+        }
+
+        /* --- Quotes Screen --- */
+        .quotes-screen {
+            overflow-y: auto;
+            justify-content: flex-start;
+            padding: 6vh 1.5rem 4vh;
+            z-index: 200;
+            /* Fully obscure underlying screens */
+            background-color: var(--bg);
+            /* Smooth momentum scroll on iOS/older WebKit */
+            -webkit-overflow-scrolling: touch;
+            /* Prevent scroll chaining / pull-to-refresh interfering on mobile */
+            overscroll-behavior-y: contain;
+            /* Crisp text antialiasing on macOS/Chrome */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .quotes-feed {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.4rem;
+            padding: 2vh 0 6vh;
+        }
+
+        .quotes-feed-item {
+            font-size: clamp(1rem, 3.5vw, 1.2rem);
+            font-weight: 300;
+            font-style: italic;
+            color: rgba(255, 255, 255, 0.75);
+            line-height: 1.65;
+            text-align: center;
+            padding: 1rem 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            opacity: 0;
+            /* Opacity-only fade-in: no transform → no compositor layer promotion,
+               so subpixel font antialiasing stays sharp during and after scroll. */
+            animation: quoteFadeIn 0.5s ease forwards;
+        }
+
+        .quotes-feed-item:last-child {
+            border-bottom: none;
+        }
+
+        @keyframes quoteFadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
         /* --- Streak Button (top-right, all screens) --- */
         .streak-btn {
             position: fixed;
@@ -575,6 +656,14 @@
                 padding: 12vh 0 8vh 0;
             }
 
+            /* Quotes button */
+            .quotes-btn {
+                top: max(env(safe-area-inset-top, 8px), 8px);
+                left: 12px;
+                padding: 0.45rem 0.8rem;
+                font-size: 0.8rem;
+            }
+
             /* Streak button */
             .streak-btn {
                 top: max(env(safe-area-inset-top, 8px), 8px);
@@ -809,6 +898,9 @@
 
 <body>
 
+    <!-- Quotes button -->
+    <button class="quotes-btn" id="quotesBtn" onclick="openQuotes()">Quotes</button>
+
     <!-- Streak button (visible on all screens) -->
     <button class="streak-btn" id="streakBtn" onclick="openStreak()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -828,7 +920,7 @@
         <h2 style="margin-top: 5vh;">Select Duration</h2>
         <div class="picker-wrapper">
             <div id="pickerOverlay" class="picker-overlay" onclick="startSession()">
-                <span style="opacity:0.5">min</span>
+                <span id="pickerUnit" style="opacity:0.5">sec</span>
             </div>
             <ul id="picker" class="picker"></ul>
         </div>
@@ -849,6 +941,13 @@
         </div>
     </div>
 
+    <!-- Quotes Screen -->
+    <div id="quotesScreen" class="screen quotes-screen">
+        <button class="streak-back" onclick="closeQuotes()">&larr; Back</button>
+        <h2 style="margin-top: 5vh; text-align: center;">Quotes</h2>
+        <div class="quotes-feed" id="quotesFeed"></div>
+    </div>
+
     <!-- Streak Screen -->
     <div id="streakScreen" class="screen streak-screen">
         <button class="streak-back" onclick="closeStreak()">&larr; Back</button>
@@ -867,154 +966,510 @@
         const picker = document.getElementById('picker');
         const mainCircle = document.getElementById('mainCircle');
         const breatheText = document.getElementById('breatheText');
+        const pickerUnitEl = document.getElementById('pickerUnit');
+        const streakBtnEl = document.getElementById('streakBtn');
+        const quotesBtnEl = document.getElementById('quotesBtn');
+        const streakBtnLabelEl = document.getElementById('streakBtnLabel');
+        const s1El = document.getElementById('s1');
+        const s2El = document.getElementById('s2');
+        const s34El = document.getElementById('s34');
+        const checkSvgEl = document.getElementById('checkSvg');
+        const s4UIEl = document.getElementById('s4UI');
+        const quotesScreenEl = document.getElementById('quotesScreen');
+        const streakScreenEl = document.getElementById('streakScreen');
+        const screenEls = document.querySelectorAll('.screen');
 
         let selectedDurationMs = 60000;
         let isSessionActive = false;
         let itemHeight = 0;
         let lastIndex = -1;
+        let wakeLock = null;
 
-        /* --- 16,000 Intentions Generator (Grammatically Vetted) --- */
-        const intentions = (() => {
-            const list = [];
+        async function requestWakeLock() {
+            if (!('wakeLock' in navigator)) return;
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+            } catch (err) {
+                console.error('Wake Lock error:', err);
+            }
+        }
 
-            // Pool 1: Presence (Transitive & Prepositional Focus Verbs + Tranquil Nouns)
-            const p1V = ["Focus on", "Embrace", "Notice", "Accept", "Connect with", "Find peace in", "Bring awareness to", "Settle into", "Return to", "Rest in", "Center yourself in", "Welcome", "Observe", "Acknowledge", "Surrender to", "Sink into", "Tune into", "Be present with", "Ground yourself in", "Anchor your mind in"];
-            const p1N = ["the present moment", "the stillness within", "your natural breath", "the here and now", "the quiet of this space", "your inner calm", "this exact second", "the feeling of peace", "the silence around you", "the simplicity of now", "your own rhythm", "this fleeting moment", "the space between thoughts", "the gentle flow of time", "the depth of now", "your current state of being", "the surrounding calm", "the clarity within", "the unseen energy of today", "the reality of this breath"];
-            const p1E = [".", ". Let it be.", ". There is no rush.", ". You are safe here.", ". All is well.", ". Let it anchor you.", ". Notice how it feels.", ". Embrace it fully.", ". Breathe deeply.", ". Find comfort in this."];
-            for (let v of p1V) for (let n of p1N) for (let e of p1E) list.push(`${v} ${n}${e}`);
+        function releaseWakeLock() {
+            if (wakeLock !== null) {
+                const w = wakeLock;
+                wakeLock = null;
+                w.release().catch(() => { });
+            }
+        }
 
-            // Pool 2: Release (Action Verbs + Heavy/Negative Nouns)
-            const p2V = ["Let go of", "Release", "Exhale", "Breathe out", "Free yourself from", "Soften around", "Unclench from", "Melt away", "Shed", "Clear away", "Dissolve", "Wash away", "Detach from", "Unwind from", "Ease away", "Step back from", "Let fade", "Banish", "Surrender", "Cast away"];
-            const p2N = ["the day's tension", "any lingering stress", "your immediate worries", "the weight on your shoulders", "feelings of restlessness", "the day's heavy burdens", "physical tightness", "shadows of the past", "anxieties about the future", "heavy thoughts", "what you cannot control", "unnecessary mental clutter", "the outside noise", "rigid expectations", "internal resistance", "seeds of doubt", "lingering fear", "the urge to rush", "harsh self-judgments", "the need to fix everything"];
-            const p2E = [".", ". Find your center.", ". Allow peace in.", ". Return to now.", ". Feel the lightness.", ". Let it pass.", ". Watch it fade.", ". You are free.", ". Soften your gaze.", ". Release completely."];
-            for (let v of p2V) for (let n of p2N) for (let e of p2E) list.push(`${v} ${n}${e}`);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && isSessionActive) {
+                requestWakeLock();
+            }
+        });
 
-            // Pool 3: Gratitude (Appreciation Verbs + Positive/Growth Nouns)
-            const p3V = ["Cultivate", "Nurture", "Appreciate", "Give space to", "Make peace with", "Hold space for", "Awaken to", "Listen to", "Invite in", "Open your heart to", "Reflect on", "Honor", "Respect", "Witness", "Hold compassion for", "Breathe life into", "Send kindness to", "Radiate peace toward", "Discover", "Explore"];
-            const p3N = ["the simple gift of today", "your inner resilience", "the changing seasons of life", "life's natural ebbs and flows", "your inner child", "the journey ahead of you", "your daily personal growth", "the gentle process of healing", "the rhythm of your heartbeat", "the beauty of the unknown", "the paths you have walked", "the world surrounding you", "your resilient physical body", "the quiet thoughts that arise", "the positive energy within", "the light shining around you", "your deepest, truest self", "the interconnectedness of all", "your own quiet strength", "the profound beauty of now"];
-            const p3E = [".", ". Let it guide you.", ". Trust the process.", ". Let it unfold naturally.", ". You are where you need to be.", ". No judgment needed.", ". Allow it to simply be.", ". Hold it gently in your mind.", ". See it clearly.", ". Feel its presence."];
-            for (let v of p3V) for (let n of p3N) for (let e of p3E) list.push(`${v} ${n}${e}`);
+        /* --- 16,000 Intentions (lazy, indexed) --- */
+        const intentionPools = [
+            // Pool 1: Presence
+            [
+                ["Focus on", "Embrace", "Notice", "Accept", "Connect with", "Find peace in", "Bring awareness to", "Settle into", "Return to", "Rest in", "Center yourself in", "Welcome", "Observe", "Acknowledge", "Surrender to", "Sink into", "Tune into", "Be present with", "Ground yourself in", "Anchor your mind in"],
+                ["the present moment", "the stillness within", "your natural breath", "the here and now", "the quiet of this space", "your inner calm", "this exact second", "the feeling of peace", "the silence around you", "the simplicity of now", "your own rhythm", "this fleeting moment", "the space between thoughts", "the gentle flow of time", "the depth of now", "your current state of being", "the surrounding calm", "the clarity within", "the unseen energy of today", "the reality of this breath"],
+                [".", ". Let it be.", ". There is no rush.", ". You are safe here.", ". All is well.", ". Let it anchor you.", ". Notice how it feels.", ". Embrace it fully.", ". Breathe deeply.", ". Find comfort in this."]
+            ],
+            // Pool 2: Release
+            [
+                ["Let go of", "Release", "Exhale", "Breathe out", "Free yourself from", "Soften around", "Unclench from", "Melt away", "Shed", "Clear away", "Dissolve", "Wash away", "Detach from", "Unwind from", "Ease away", "Step back from", "Let fade", "Banish", "Surrender", "Cast away"],
+                ["the day's tension", "any lingering stress", "your immediate worries", "the weight on your shoulders", "feelings of restlessness", "the day's heavy burdens", "physical tightness", "shadows of the past", "anxieties about the future", "heavy thoughts", "what you cannot control", "unnecessary mental clutter", "the outside noise", "rigid expectations", "internal resistance", "seeds of doubt", "lingering fear", "the urge to rush", "harsh self-judgments", "the need to fix everything"],
+                [".", ". Find your center.", ". Allow peace in.", ". Return to now.", ". Feel the lightness.", ". Let it pass.", ". Watch it fade.", ". You are free.", ". Soften your gaze.", ". Release completely."]
+            ],
+            // Pool 3: Gratitude
+            [
+                ["Cultivate", "Nurture", "Appreciate", "Give space to", "Make peace with", "Hold space for", "Awaken to", "Listen to", "Invite in", "Open your heart to", "Reflect on", "Honor", "Respect", "Witness", "Hold compassion for", "Breathe life into", "Send kindness to", "Radiate peace toward", "Discover", "Explore"],
+                ["the simple gift of today", "your inner resilience", "the changing seasons of life", "life's natural ebbs and flows", "your inner child", "the journey ahead of you", "your daily personal growth", "the gentle process of healing", "the rhythm of your heartbeat", "the beauty of the unknown", "the paths you have walked", "the world surrounding you", "your resilient physical body", "the quiet thoughts that arise", "the positive energy within", "the light shining around you", "your deepest, truest self", "the interconnectedness of all", "your own quiet strength", "the profound beauty of now"],
+                [".", ". Let it guide you.", ". Trust the process.", ". Let it unfold naturally.", ". You are where you need to be.", ". No judgment needed.", ". Allow it to simply be.", ". Hold it gently in your mind.", ". See it clearly.", ". Feel its presence."]
+            ],
+            // Pool 4: Balance
+            [
+                ["Find balance in", "Ground yourself amidst", "Stay open to", "Yield softly to", "Navigate", "Flow gently with", "Settle your mind around", "Breathe softly into", "Look gently at", "Observe the nature of", "Align with", "Harmonize with", "Embody", "Radiate", "Channel", "Direct your love to", "Find quiet strength in", "Uncover", "Embrace the journey of", "Allow time for"],
+                ["the subtle shifts of life", "your true, authentic nature", "the quiet wisdom within", "the peaceful space around you", "infinite new possibilities", "the stillness beneath the surface", "your steady, unchanging core", "the gentle breeze of change", "the unfolding path ahead", "your higher, wiser self", "the present, grounding reality", "the hidden joy in small things", "the slow, deliberate moments", "the calm center of your mind", "your natural, effortless balance", "the peaceful, quiet void", "the living, breathing moment", "the grounding energy of earth", "the open, expansive sky", "the natural tide of your breath"],
+                [".", ". Step smoothly into it.", ". Rest safely right here.", ". Let it wash over you.", ". It is more than enough.", ". You are enough as you are.", ". Simply observe without reacting.", ". Let go of everything else.", ". Breathe deeply into it.", ". Stay a while in this feeling."]
+            ]
+        ];
+        const intentionsLength = intentionPools.reduce((s, p) => s + p[0].length * p[1].length * p[2].length, 0);
+        function getIntention(idx) {
+            for (let pi = 0; pi < intentionPools.length; pi++) {
+                const V = intentionPools[pi][0], N = intentionPools[pi][1], E = intentionPools[pi][2];
+                const size = V.length * N.length * E.length;
+                if (idx < size) {
+                    const eLen = E.length, nLen = N.length;
+                    const ne = nLen * eLen;
+                    return V[(idx / ne) | 0] + ' ' + N[((idx % ne) / eLen) | 0] + E[idx % eLen];
+                }
+                idx -= size;
+            }
+            return '';
+        }
 
-            // Pool 4: Balance (Alignment Verbs + Spatial/State Nouns)
-            const p4V = ["Find balance in", "Ground yourself amidst", "Stay open to", "Yield softly to", "Navigate", "Flow gently with", "Settle your mind around", "Breathe softly into", "Look gently at", "Observe the nature of", "Align with", "Harmonize with", "Embody", "Radiate", "Channel", "Direct your love to", "Find quiet strength in", "Uncover", "Embrace the journey of", "Allow time for"];
-            const p4N = ["the subtle shifts of life", "your true, authentic nature", "the quiet wisdom within", "the peaceful space around you", "infinite new possibilities", "the stillness beneath the surface", "your steady, unchanging core", "the gentle breeze of change", "the unfolding path ahead", "your higher, wiser self", "the present, grounding reality", "the hidden joy in small things", "the slow, deliberate moments", "the calm center of your mind", "your natural, effortless balance", "the peaceful, quiet void", "the living, breathing moment", "the grounding energy of earth", "the open, expansive sky", "the natural tide of your breath"];
-            const p4E = [".", ". Step smoothly into it.", ". Rest safely right here.", ". Let it wash over you.", ". It is more than enough.", ". You are enough as you are.", ". Simply observe without reacting.", ". Let go of everything else.", ". Breathe deeply into it.", ". Stay a while in this feeling."];
-            for (let v of p4V) for (let n of p4N) for (let e of p4E) list.push(`${v} ${n}${e}`);
+        /* --- 10,000 Motivational Quotes (lazy, indexed) --- */
+        const motivData = {
+            a1: ["You're doing great", "You showed up today", "You chose yourself", "You're making progress", "You're stronger than you think", "You're exactly where you need to be", "You matter more than you know", "You're building something real", "You've already come so far", "You're braver than you believe", "Your effort is paying off", "You're growing every single day", "You handled today well", "You're more capable than you realize", "You didn't give up", "You're on the right path", "You took a step forward", "You chose peace today", "You showed real courage", "You're doing better than you think", "Your heart is in the right place", "You're learning and that's enough", "You kept going when it was hard", "You found the strength to try", "You are worthy of this moment", "You gave it your best", "You stayed true to yourself", "You're creating positive change", "You made a difference today", "You honored your own needs", "You rose above the noise", "You showed up with intention", "You're healing at your own pace", "You turned a hard day around", "You chose kindness for yourself", "You've earned this quiet moment", "You're writing your own story", "You pushed through the doubt", "You trusted the process", "You proved something to yourself", "You took care of your mind", "You prioritized your peace", "You're becoming who you're meant to be", "You let go of what didn't serve you", "You found stillness in the chaos", "You showed patience with yourself", "You've grown more than you see", "You made space for calm", "You invested in yourself", "You chose to breathe"],
+            e1: ["Keep going", "Every step counts", "Tomorrow will thank you", "This is what strength looks like", "Be proud of that", "The world needs your light", "That takes real courage", "Small steps lead to big changes", "You're proof that trying matters", "Give yourself credit", "Celebrate this victory", "Your consistency is powerful", "Trust your journey", "This moment matters", "Let that sink in", "You deserve to feel this good", "Remember how far you've come", "The hard days make you stronger", "You're planting seeds of change", "Breathe and believe", "Your future self will thank you", "This is your time to shine", "Nothing can take this from you", "You are unstoppable", "Stay on this path", "The best is still ahead", "Hold your head high", "You're inspiring others without knowing it", "Quiet progress is still progress", "Believe in your own rhythm", "You're building unshakable peace", "One breath at a time", "Your presence here proves your strength", "Let yourself feel proud", "The calm you feel is real", "You're choosing a better life", "Never underestimate your will", "Every session adds up", "You're rewriting your habits", "Peace is your superpower", "You showed up and that's everything", "Growth looks good on you", "Your mind is getting sharper", "Stillness is strength", "You're mastering your own mind", "This dedication is rare", "You're a force of nature", "Discipline is self-love", "Keep nurturing this version of you", "You belong in this calm"],
+            c2: ["Amazing work", "Look at you go", "What a journey", "Incredible effort", "Well done", "Fantastic commitment", "You're thriving", "Beautiful progress", "Powerful choice", "Outstanding dedication", "Impressive streak", "Remarkable resilience", "Brilliant consistency", "Wonderful discipline", "Stunning growth", "Admirable focus", "Exceptional strength", "Magnificent perseverance", "Extraordinary will", "Phenomenal energy", "Unstoppable momentum", "Genuine bravery", "Real dedication", "True grit", "Pure determination", "Absolute commitment", "Solid progress", "Steady growth", "Undeniable strength", "Quiet power", "Deep resilience", "Natural talent", "Inner fire", "Bold move", "Great instinct", "Strong foundation", "Clear vision", "Sharp focus", "Calm courage", "Brave heart", "Wise choice", "Kind soul", "Warm spirit", "Bright energy", "Fresh start", "New chapter", "Open mind", "Full presence", "Sweet victory", "Proud moment"],
+            w2: ["Every breath you take builds inner peace", "Consistency is the bridge to transformation", "Small moments of calm create lasting change", "Peace of mind is the greatest wealth", "The quietest minds often hold the deepest strength", "Patience with yourself is the first act of kindness", "Real growth happens in the silence", "Your breath is always there to bring you home", "Showing up is half the battle won", "Calm is a skill you're perfecting daily", "What you practice today shapes who you become", "Stillness teaches what noise never can", "A peaceful mind opens a thousand doors", "You don't need to be perfect to be powerful", "Rest and progress are not opposites", "Healing is not linear but it is always forward", "Every moment of mindfulness is a gift to yourself", "The present moment is the only one that truly exists", "Your commitment to yourself is the most important one", "Strength isn't always loud; sometimes it's a deep breath", "What you nurture in silence blooms in your life", "The journey inward is the most rewarding one", "Choosing calm is an act of rebellion against chaos", "You are not behind; you are on your own timeline", "A single mindful minute can shift your entire day", "The peace you're building is unbreakable", "Your dedication to growth is extraordinary", "Meditation is a conversation with your best self", "You're training your mind like an athlete trains their body", "In the stillness, you find your true strength", "Every session is an investment in your well-being", "The discipline to be still is the rarest kind", "You're creating a sanctuary inside your own mind", "The calm you cultivate now will carry you through storms", "Mindfulness is the art of coming home to yourself", "You're proving that inner peace is a choice", "The greatest journey is the one within", "Self-care isn't selfish; it's essential", "You're becoming the calm in your own storm", "Breathing with intention changes everything", "The stillness you practice echoes in all you do", "You are the author of your own peace", "Every exhale releases what no longer serves you", "Your consistency speaks volumes about your character", "The world gets better when you take care of yourself", "Presence is the most powerful gift you can give", "You're building a life rooted in awareness", "In your stillness, the universe moves for you", "Each breath is a fresh beginning", "Peace is not found; it is created by you"],
+            t3: ["you are enough just as you are", "progress is not always visible", "rest is a form of strength", "your best is always enough", "difficult roads lead to beautiful places", "the storm always passes", "you've survived every hard day so far", "there's no wrong pace for healing", "you carry more light than you know", "your journey is yours alone", "peace begins with a single breath", "not every day has to be perfect", "showing up is an act of courage", "vulnerability is not weakness", "you are not your anxious thoughts", "growth comes in waves", "small wins build mighty victories", "you deserve the peace you give others", "it's okay to start over", "your worth is not tied to productivity", "kindness to yourself is never wasted", "silence can be the loudest healer", "you are more than your worst day", "every ending holds a new beginning", "comparison steals nothing but your joy", "the hardest battles are fought within", "your potential is limitless", "you are allowed to take up space", "imperfection is perfectly human", "the present is a gift", "there is strength in letting go", "your feelings are always valid", "no one can walk your path for you", "you were built for this", "the darkest nights produce the brightest stars", "there is magic in starting again", "you have permission to rest", "growth doesn't always feel comfortable", "your awareness is your greatest tool", "the only way out is through", "you are the calm you've been seeking", "there is no finish line for self-improvement", "every setback is a setup for a comeback", "your breath is your anchor", "peace is power in its purest form", "the mind you train today protects you tomorrow", "gentleness is the ultimate strength", "you don't have to carry everything at once", "the light within you outshines any darkness", "every moment of presence is a meditation"],
+            af3: ["You've got this", "Keep believing in yourself", "Never forget your worth", "Stay gentle with yourself", "Let that truth guide you", "Carry that with you today", "Hold onto that", "Breathe that in deeply", "Let it fuel your fire", "You are living proof of that", "Own that truth", "Stand tall in that knowledge", "Let it settle in your bones", "Trust yourself completely", "You know this in your heart", "Let that be your compass", "Walk forward with confidence", "Wear that truth proudly", "Feel it in every breath", "Let it light your way", "Nothing can dim that", "Take strength from that", "That's your foundation", "Build on that every day", "Anchor yourself in that", "Rise with that knowledge", "Shine with that awareness", "Grow from that understanding", "Move forward with that wisdom", "Be at peace with that", "Honor that in yourself", "Celebrate that quietly", "Hold that close", "Nurture that truth daily", "Return to that when in doubt", "That is your power", "That's what makes you remarkable", "Let that set you free", "Embrace every part of that", "Find comfort in knowing that", "Stay rooted in that belief", "Keep that fire burning", "Channel that energy forward", "That's your story to tell", "Be proud of knowing that", "That wisdom runs deep in you", "Let that lift you up", "Carry that like armor", "That's the real you speaking", "That changes everything"],
+            v4: ["Celebrate", "Honor", "Protect", "Nurture", "Strengthen", "Trust", "Acknowledge", "Embrace", "Respect", "Amplify", "Fuel", "Guard", "Channel", "Treasure", "Cultivate", "Savor", "Cherish", "Unleash", "Harness", "Reclaim", "Deepen", "Sharpen", "Polish", "Refine", "Elevate", "Enrich", "Expand", "Fortify", "Nourish", "Sustain", "Value", "Appreciate", "Develop", "Explore", "Ignite", "Awaken", "Restore", "Revive", "Renew", "Liberate", "Empower", "Charge", "Activate", "Unlock", "Discover", "Reveal", "Release", "Accept", "Welcome", "Own"],
+            q4: ["inner peace", "quiet strength", "gentle courage", "daily progress", "mindful nature", "patient spirit", "calm energy", "steady growth", "deep focus", "resilient heart", "warm compassion", "fierce determination", "brilliant awareness", "natural rhythm", "authentic power", "unwavering commitment", "peaceful intention", "grounded presence", "creative spirit", "balanced mind", "fierce kindness", "boundless potential", "healing journey", "still center", "bright clarity", "wild hope", "sacred space", "brave vulnerability", "honest reflection", "relentless optimism", "tender self-care", "bold authenticity", "quiet confidence", "humble wisdom", "steadfast patience", "joyful discipline", "raw honesty", "unconditional worth", "glowing vitality", "renewed purpose", "unshakable faith", "deep gratitude", "soft power", "true resilience", "open curiosity", "radical acceptance", "boundless love", "effortless grace", "clear intention", "magnetic calm"],
+            r4: ["It will carry you through anything", "It's your greatest asset", "The world responds to it", "It makes you unstoppable", "It's already changing your life", "It grows stronger with every breath", "Others notice it even when you don't", "It sets you apart", "It's the source of your power", "It heals everything it touches", "It opens doors you can't yet see", "It inspires more than you know", "It's a gift only you possess", "It's the foundation of everything good", "It shines brighter every day", "It transforms challenges into growth", "It's what makes you extraordinary", "It attracts the right things to you", "It deepens with every session", "It protects you in ways you can't imagine", "It brings clarity to confusion", "It turns doubt into confidence", "It makes you magnetic", "It shows in everything you do", "It's the key to your happiness", "It fuels your greatest achievements", "It creates ripples of change around you", "It calms every storm you face", "It's your secret weapon", "It only gets stronger from here", "It defines your best self", "It lights the path ahead", "It makes every day better", "It's the reason you're here", "It anchors you when things get tough", "It's already working for you", "It multiplies when you share it", "It never runs out", "It's been there all along", "It surprises you with its depth", "It connects you to something greater", "It makes the impossible feel possible", "It's your north star", "It holds the answers you seek", "It grows every time you practice", "It's the calm within the storm", "It reminds you who you really are", "It lifts everyone around you", "It keeps you centered", "It's proof of your dedication"]
+        };
+        const motivQuotesLength = 10000;
+        function getMotivQuote(idx) {
+            if (idx < 2500) {
+                return motivData.a1[(idx / 50) | 0] + '. ' + motivData.e1[idx % 50] + '.';
+            }
+            if (idx < 5000) {
+                const i = idx - 2500;
+                return motivData.c2[(i / 50) | 0] + '! ' + motivData.w2[i % 50] + '.';
+            }
+            if (idx < 7500) {
+                const i = idx - 5000;
+                return 'Remember: ' + motivData.t3[(i / 50) | 0] + '. ' + motivData.af3[i % 50] + '.';
+            }
+            // Pattern 4 was capped at 2500 entries; preserves original v=v4[0] selection
+            const i = idx - 7500;
+            return motivData.v4[0] + ' your ' + motivData.q4[(i / 50) | 0] + '. ' + motivData.r4[i % 50] + '.';
+        }
 
-            return list;
-        })();
-
-        /* --- 10,000+ Motivational Quotes Generator (Non-AI, Combinatorial) --- */
-        const motivQuotes = (() => {
-            const q = [];
-            // Pattern 1: "[Affirmation]. [Encouragement]." (50 × 50 = 2,500)
-            const a1 = ["You're doing great", "You showed up today", "You chose yourself", "You're making progress", "You're stronger than you think", "You're exactly where you need to be", "You matter more than you know", "You're building something real", "You've already come so far", "You're braver than you believe", "Your effort is paying off", "You're growing every single day", "You handled today well", "You're more capable than you realize", "You didn't give up", "You're on the right path", "You took a step forward", "You chose peace today", "You showed real courage", "You're doing better than you think", "Your heart is in the right place", "You're learning and that's enough", "You kept going when it was hard", "You found the strength to try", "You are worthy of this moment", "You gave it your best", "You stayed true to yourself", "You're creating positive change", "You made a difference today", "You honored your own needs", "You rose above the noise", "You showed up with intention", "You're healing at your own pace", "You turned a hard day around", "You chose kindness for yourself", "You've earned this quiet moment", "You're writing your own story", "You pushed through the doubt", "You trusted the process", "You proved something to yourself", "You took care of your mind", "You prioritized your peace", "You're becoming who you're meant to be", "You let go of what didn't serve you", "You found stillness in the chaos", "You showed patience with yourself", "You've grown more than you see", "You made space for calm", "You invested in yourself", "You chose to breathe"];
-            const e1 = ["Keep going", "Every step counts", "Tomorrow will thank you", "This is what strength looks like", "Be proud of that", "The world needs your light", "That takes real courage", "Small steps lead to big changes", "You're proof that trying matters", "Give yourself credit", "Celebrate this victory", "Your consistency is powerful", "Trust your journey", "This moment matters", "Let that sink in", "You deserve to feel this good", "Remember how far you've come", "The hard days make you stronger", "You're planting seeds of change", "Breathe and believe", "Your future self will thank you", "This is your time to shine", "Nothing can take this from you", "You are unstoppable", "Stay on this path", "The best is still ahead", "Hold your head high", "You're inspiring others without knowing it", "Quiet progress is still progress", "Believe in your own rhythm", "You're building unshakable peace", "One breath at a time", "Your presence here proves your strength", "Let yourself feel proud", "The calm you feel is real", "You're choosing a better life", "Never underestimate your will", "Every session adds up", "You're rewriting your habits", "Peace is your superpower", "You showed up and that's everything", "Growth looks good on you", "Your mind is getting sharper", "Stillness is strength", "You're mastering your own mind", "This dedication is rare", "You're a force of nature", "Discipline is self-love", "Keep nurturing this version of you", "You belong in this calm"];
-            for (let a of a1) for (let e of e1) q.push(`${a}. ${e}.`);
-
-            // Pattern 2: "[Celebration]! [Wisdom]." (50 × 50 = 2,500)
-            const c2 = ["Amazing work", "Look at you go", "What a journey", "Incredible effort", "Well done", "Fantastic commitment", "You're thriving", "Beautiful progress", "Powerful choice", "Outstanding dedication", "Impressive streak", "Remarkable resilience", "Brilliant consistency", "Wonderful discipline", "Stunning growth", "Admirable focus", "Exceptional strength", "Magnificent perseverance", "Extraordinary will", "Phenomenal energy", "Unstoppable momentum", "Genuine bravery", "Real dedication", "True grit", "Pure determination", "Absolute commitment", "Solid progress", "Steady growth", "Undeniable strength", "Quiet power", "Deep resilience", "Natural talent", "Inner fire", "Bold move", "Great instinct", "Strong foundation", "Clear vision", "Sharp focus", "Calm courage", "Brave heart", "Wise choice", "Kind soul", "Warm spirit", "Bright energy", "Fresh start", "New chapter", "Open mind", "Full presence", "Sweet victory", "Proud moment"];
-            const w2 = ["Every breath you take builds inner peace", "Consistency is the bridge to transformation", "Small moments of calm create lasting change", "Peace of mind is the greatest wealth", "The quietest minds often hold the deepest strength", "Patience with yourself is the first act of kindness", "Real growth happens in the silence", "Your breath is always there to bring you home", "Showing up is half the battle won", "Calm is a skill you're perfecting daily", "What you practice today shapes who you become", "Stillness teaches what noise never can", "A peaceful mind opens a thousand doors", "You don't need to be perfect to be powerful", "Rest and progress are not opposites", "Healing is not linear but it is always forward", "Every moment of mindfulness is a gift to yourself", "The present moment is the only one that truly exists", "Your commitment to yourself is the most important one", "Strength isn't always loud; sometimes it's a deep breath", "What you nurture in silence blooms in your life", "The journey inward is the most rewarding one", "Choosing calm is an act of rebellion against chaos", "You are not behind; you are on your own timeline", "A single mindful minute can shift your entire day", "The peace you're building is unbreakable", "Your dedication to growth is extraordinary", "Meditation is a conversation with your best self", "You're training your mind like an athlete trains their body", "In the stillness, you find your true strength", "Every session is an investment in your well-being", "The discipline to be still is the rarest kind", "You're creating a sanctuary inside your own mind", "The calm you cultivate now will carry you through storms", "Mindfulness is the art of coming home to yourself", "You're proving that inner peace is a choice", "The greatest journey is the one within", "Self-care isn't selfish; it's essential", "You're becoming the calm in your own storm", "Breathing with intention changes everything", "The stillness you practice echoes in all you do", "You are the author of your own peace", "Every exhale releases what no longer serves you", "Your consistency speaks volumes about your character", "The world gets better when you take care of yourself", "Presence is the most powerful gift you can give", "You're building a life rooted in awareness", "In your stillness, the universe moves for you", "Each breath is a fresh beginning", "Peace is not found; it is created by you"];
-            for (let c of c2) for (let w of w2) q.push(`${c}! ${w}.`);
-
-            // Pattern 3: "Remember: [truth]. [affirmation]." (50 × 50 = 2,500)
-            const t3 = ["you are enough just as you are", "progress is not always visible", "rest is a form of strength", "your best is always enough", "difficult roads lead to beautiful places", "the storm always passes", "you've survived every hard day so far", "there's no wrong pace for healing", "you carry more light than you know", "your journey is yours alone", "peace begins with a single breath", "not every day has to be perfect", "showing up is an act of courage", "vulnerability is not weakness", "you are not your anxious thoughts", "growth comes in waves", "small wins build mighty victories", "you deserve the peace you give others", "it's okay to start over", "your worth is not tied to productivity", "kindness to yourself is never wasted", "silence can be the loudest healer", "you are more than your worst day", "every ending holds a new beginning", "comparison steals nothing but your joy", "the hardest battles are fought within", "your potential is limitless", "you are allowed to take up space", "imperfection is perfectly human", "the present is a gift", "there is strength in letting go", "your feelings are always valid", "no one can walk your path for you", "you were built for this", "the darkest nights produce the brightest stars", "there is magic in starting again", "you have permission to rest", "growth doesn't always feel comfortable", "your awareness is your greatest tool", "the only way out is through", "you are the calm you've been seeking", "there is no finish line for self-improvement", "every setback is a setup for a comeback", "your breath is your anchor", "peace is power in its purest form", "the mind you train today protects you tomorrow", "gentleness is the ultimate strength", "you don't have to carry everything at once", "the light within you outshines any darkness", "every moment of presence is a meditation"];
-            const af3 = ["You've got this", "Keep believing in yourself", "Never forget your worth", "Stay gentle with yourself", "Let that truth guide you", "Carry that with you today", "Hold onto that", "Breathe that in deeply", "Let it fuel your fire", "You are living proof of that", "Own that truth", "Stand tall in that knowledge", "Let it settle in your bones", "Trust yourself completely", "You know this in your heart", "Let that be your compass", "Walk forward with confidence", "Wear that truth proudly", "Feel it in every breath", "Let it light your way", "Nothing can dim that", "Take strength from that", "That's your foundation", "Build on that every day", "Anchor yourself in that", "Rise with that knowledge", "Shine with that awareness", "Grow from that understanding", "Move forward with that wisdom", "Be at peace with that", "Honor that in yourself", "Celebrate that quietly", "Hold that close", "Nurture that truth daily", "Return to that when in doubt", "That is your power", "That's what makes you remarkable", "Let that set you free", "Embrace every part of that", "Find comfort in knowing that", "Stay rooted in that belief", "Keep that fire burning", "Channel that energy forward", "That's your story to tell", "Be proud of knowing that", "That wisdom runs deep in you", "Let that lift you up", "Carry that like armor", "That's the real you speaking", "That changes everything"];
-            for (let t of t3) for (let a of af3) q.push(`Remember: ${t}. ${a}.`);
-
-            // Pattern 4: "[Verb] your [quality]. [Reward]." (50 × 50 = 2,500)
-            const v4 = ["Celebrate", "Honor", "Protect", "Nurture", "Strengthen", "Trust", "Acknowledge", "Embrace", "Respect", "Amplify", "Fuel", "Guard", "Channel", "Treasure", "Cultivate", "Savor", "Cherish", "Unleash", "Harness", "Reclaim", "Deepen", "Sharpen", "Polish", "Refine", "Elevate", "Enrich", "Expand", "Fortify", "Nourish", "Sustain", "Value", "Appreciate", "Develop", "Explore", "Ignite", "Awaken", "Restore", "Revive", "Renew", "Liberate", "Empower", "Charge", "Activate", "Unlock", "Discover", "Reveal", "Release", "Accept", "Welcome", "Own"];
-            const q4 = ["inner peace", "quiet strength", "gentle courage", "daily progress", "mindful nature", "patient spirit", "calm energy", "steady growth", "deep focus", "resilient heart", "warm compassion", "fierce determination", "brilliant awareness", "natural rhythm", "authentic power", "unwavering commitment", "peaceful intention", "grounded presence", "creative spirit", "balanced mind", "fierce kindness", "boundless potential", "healing journey", "still center", "bright clarity", "wild hope", "sacred space", "brave vulnerability", "honest reflection", "relentless optimism", "tender self-care", "bold authenticity", "quiet confidence", "humble wisdom", "steadfast patience", "joyful discipline", "raw honesty", "unconditional worth", "glowing vitality", "renewed purpose", "unshakable faith", "deep gratitude", "soft power", "true resilience", "open curiosity", "radical acceptance", "boundless love", "effortless grace", "clear intention", "magnetic calm"];
-            const r4 = ["It will carry you through anything", "It's your greatest asset", "The world responds to it", "It makes you unstoppable", "It's already changing your life", "It grows stronger with every breath", "Others notice it even when you don't", "It sets you apart", "It's the source of your power", "It heals everything it touches", "It opens doors you can't yet see", "It inspires more than you know", "It's a gift only you possess", "It's the foundation of everything good", "It shines brighter every day", "It transforms challenges into growth", "It's what makes you extraordinary", "It attracts the right things to you", "It deepens with every session", "It protects you in ways you can't imagine", "It brings clarity to confusion", "It turns doubt into confidence", "It makes you magnetic", "It shows in everything you do", "It's the key to your happiness", "It fuels your greatest achievements", "It creates ripples of change around you", "It calms every storm you face", "It's your secret weapon", "It only gets stronger from here", "It defines your best self", "It lights the path ahead", "It makes every day better", "It's the reason you're here", "It anchors you when things get tough", "It's already working for you", "It multiplies when you share it", "It never runs out", "It's been there all along", "It surprises you with its depth", "It connects you to something greater", "It makes the impossible feel possible", "It's your north star", "It holds the answers you seek", "It grows every time you practice", "It's the calm within the storm", "It reminds you who you really are", "It lifts everyone around you", "It keeps you centered", "It's proof of your dedication"];
-            for (let v of v4) for (let qv of q4) for (let r of r4) { if (q.length < 10000) q.push(`${v} your ${qv}. ${r}.`); }
-
-            return q;
-        })();
-
-        /* --- Streak Tracking (localStorage) --- */
+        /* --- Streak Tracking (localStorage, local timezone, DST-safe) --- */
+        function dayKey(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return y + '-' + m + '-' + day;
+        }
         function getSessionLog() {
             try { return JSON.parse(localStorage.getItem('zen_sessions') || '[]'); } catch (e) { return []; }
         }
         function logSession(durationMin) {
             const log = getSessionLog();
-            log.push({ date: new Date().toISOString().slice(0, 10), mins: durationMin });
+            log.push({ date: dayKey(new Date()), mins: durationMin });
             try { localStorage.setItem('zen_sessions', JSON.stringify(log)); } catch (e) { }
         }
-        function calcStreak() {
-            const log = getSessionLog();
-            const uniqueDays = [...new Set(log.map(s => s.date))].sort().reverse();
-            if (uniqueDays.length === 0) return 0;
-            const today = new Date().toISOString().slice(0, 10);
-            const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-            // Streak must include today or yesterday
+        function calcStreak(log) {
+            if (!log) log = getSessionLog();
+            if (log.length === 0) return 0;
+            const seen = new Set();
+            for (let i = 0; i < log.length; i++) seen.add(log[i].date);
+            const uniqueDays = Array.from(seen).sort().reverse();
+            const today = dayKey(new Date());
+            const yDate = new Date();
+            yDate.setDate(yDate.getDate() - 1);
+            const yesterday = dayKey(yDate);
             if (uniqueDays[0] !== today && uniqueDays[0] !== yesterday) return 0;
             let streak = 1;
             for (let i = 0; i < uniqueDays.length - 1; i++) {
-                const cur = new Date(uniqueDays[i]);
-                const prev = new Date(uniqueDays[i + 1]);
-                const diff = (cur - prev) / 86400000;
+                const cur = new Date(uniqueDays[i] + 'T00:00:00');
+                const prev = new Date(uniqueDays[i + 1] + 'T00:00:00');
+                const diff = Math.round((cur - prev) / 86400000);
                 if (diff === 1) streak++;
                 else break;
             }
             return streak;
         }
-        function getLast14Days() {
-            const log = getSessionLog();
+        function getLast14Days(log) {
+            if (!log) log = getSessionLog();
+            const minsByDate = Object.create(null);
+            for (let i = 0; i < log.length; i++) {
+                const s = log[i];
+                minsByDate[s.date] = (minsByDate[s.date] || 0) + s.mins;
+            }
             const days = [];
             const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
             for (let i = 13; i >= 0; i--) {
-                const d = new Date(Date.now() - i * 86400000);
-                const key = d.toISOString().slice(0, 10);
-                const mins = log.filter(s => s.date === key).reduce((sum, s) => sum + s.mins, 0);
-                days.push({ key, label: dayNames[d.getDay()], mins, isToday: i === 0 });
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+                const key = dayKey(d);
+                days.push({ key, label: dayNames[d.getDay()], mins: minsByDate[key] || 0, isToday: i === 0 });
             }
             return days;
         }
 
         function updateStreakBtn() {
-            document.getElementById('streakBtnLabel').textContent = calcStreak();
+            streakBtnLabelEl.textContent = calcStreak();
         }
 
         let previousScreen = 's1';
+
+        /* --- Curated real quotes for the Quotes feed (encouragement, stress, anxiety) --- */
+        const positiveQuotes = [
+            "“You are braver than you believe, stronger than you seem, and smarter than you think.” — A.A. Milne",
+            "“It always seems impossible until it's done.” — Nelson Mandela",
+            "“Believe you can and you're halfway there.” — Theodore Roosevelt",
+            "“The best way out is always through.” — Robert Frost",
+            "“This too shall pass.” — Persian proverb",
+            "“Whether you think you can or you think you can't, you're right.” — Henry Ford",
+            "“Fall seven times, stand up eight.” — Japanese proverb",
+            "“It does not matter how slowly you go as long as you do not stop.” — Confucius",
+            "“You miss 100% of the shots you don't take.” — Wayne Gretzky",
+            "“Don't watch the clock; do what it does. Keep going.” — Sam Levenson",
+            "“Success is not final, failure is not fatal: it is the courage to continue that counts.” — Winston Churchill",
+            "“Our greatest glory is not in never falling, but in rising every time we fall.” — Confucius",
+            "“Start where you are. Use what you have. Do what you can.” — Arthur Ashe",
+            "“Courage is not the absence of fear, but the triumph over it.” — Nelson Mandela",
+            "“Do what you can, with what you have, where you are.” — Theodore Roosevelt",
+            "“What lies behind us and what lies before us are tiny matters compared to what lies within us.” — Ralph Waldo Emerson",
+            "“You don't have to see the whole staircase, just take the first step.” — Martin Luther King Jr.",
+            "“Hardships often prepare ordinary people for an extraordinary destiny.” — C.S. Lewis",
+            "“The future depends on what you do today.” — Mahatma Gandhi",
+            "“If you can't fly, then run; if you can't run, then walk; if you can't walk, then crawl. But whatever you do, you have to keep moving forward.” — Martin Luther King Jr.",
+            "“The journey of a thousand miles begins with a single step.” — Lao Tzu",
+            "“Continuous improvement is better than delayed perfection.” — Mark Twain",
+            "“Done is better than perfect.” — Sheryl Sandberg",
+            "“Action is the antidote to despair.” — Joan Baez",
+            "“The secret of getting ahead is getting started.” — Mark Twain",
+            "“Small daily improvements over time lead to stunning results.” — Robin Sharma",
+            "“Begin anywhere.” — John Cage",
+            "“Almost everything will work again if you unplug it for a few minutes — including you.” — Anne Lamott",
+            "“You don't have to control your thoughts. You just have to stop letting them control you.” — Dan Millman",
+            "“Quiet the mind, and the soul will speak.” — Ma Jaya Sati Bhagavati",
+            "“Within you there is a stillness and a sanctuary to which you can retreat at any time and be yourself.” — Hermann Hesse",
+            "“Feelings come and go like clouds in a windy sky. Conscious breathing is my anchor.” — Thich Nhat Hanh",
+            "“Breath is the bridge which connects life to consciousness.” — Thich Nhat Hanh",
+            "“The greatest weapon against stress is our ability to choose one thought over another.” — William James",
+            "“It's not the load that breaks you down, it's the way you carry it.” — Lou Holtz",
+            "“Worry does not empty tomorrow of its sorrows; it empties today of its strength.” — Corrie ten Boom",
+            "“Do not let the behavior of others destroy your inner peace.” — Dalai Lama",
+            "“You cannot stop the waves, but you can learn to surf.” — Jon Kabat-Zinn",
+            "“Peace comes from within. Do not seek it without.” — Buddha",
+            "“If you are depressed, you are living in the past. If you are anxious, you are living in the future. If you are at peace, you are living in the present.” — Lao Tzu",
+            "“The mind is everything. What you think you become.” — Buddha",
+            "“Sometimes the most productive thing you can do is rest.” — Mark Black",
+            "“Take rest; a field that has rested gives a bountiful crop.” — Ovid",
+            "“Smile, breathe, and go slowly.” — Thich Nhat Hanh",
+            "“Inhale courage, exhale fear.”",
+            "“Just breathe.”",
+            "“Even the darkest night will end and the sun will rise.” — Victor Hugo",
+            "“There is a crack in everything. That's how the light gets in.” — Leonard Cohen",
+            "“The wound is the place where the light enters you.” — Rumi",
+            "“Storms make trees take deeper roots.” — Dolly Parton",
+            "“Tough times never last, but tough people do.” — Robert H. Schuller",
+            "“Out of difficulties grow miracles.” — Jean de la Bruyère",
+            "“When you come to the end of your rope, tie a knot and hang on.” — Franklin D. Roosevelt",
+            "“Rock bottom became the solid foundation on which I rebuilt my life.” — J.K. Rowling",
+            "“Life isn't about waiting for the storm to pass; it's about learning to dance in the rain.” — Vivian Greene",
+            "“When everything seems to be going against you, remember that the airplane takes off against the wind, not with it.” — Henry Ford",
+            "“Strength does not come from physical capacity. It comes from an indomitable will.” — Mahatma Gandhi",
+            "“Pain is inevitable. Suffering is optional.” — Haruki Murakami",
+            "“Everything you've ever wanted is on the other side of fear.” — George Addair",
+            "“You yourself, as much as anybody in the entire universe, deserve your love and affection.” — Buddha",
+            "“To love oneself is the beginning of a lifelong romance.” — Oscar Wilde",
+            "“Owning our story and loving ourselves through that process is the bravest thing we'll ever do.” — Brené Brown",
+            "“Talk to yourself like you would to someone you love.” — Brené Brown",
+            "“Don't be pushed around by the fears in your mind. Be led by the dreams in your heart.” — Roy T. Bennett",
+            "“No one can make you feel inferior without your consent.” — Eleanor Roosevelt",
+            "“What you do today can improve all your tomorrows.” — Ralph Marston",
+            "“Wherever you are, be there totally.” — Eckhart Tolle",
+            "“Realize deeply that the present moment is all you ever have.” — Eckhart Tolle",
+            "“The present moment is filled with joy and happiness. If you are attentive, you will see it.” — Thich Nhat Hanh",
+            "“Be happy in the moment, that's enough. Each moment is all we need, not more.” — Mother Teresa",
+            "“Yesterday is history, tomorrow is a mystery, today is a gift; that's why they call it the present.” — Bil Keane",
+            "“Slow down. Calm down. Don't worry. Don't hurry. Trust the process.” — Alexandra Stoddard",
+            "“In the depth of winter, I finally learned that within me there lay an invincible summer.” — Albert Camus",
+            "“Hope is being able to see that there is light despite all of the darkness.” — Desmond Tutu",
+            "“Once you choose hope, anything's possible.” — Christopher Reeve",
+            "“Hope is the thing with feathers that perches in the soul.” — Emily Dickinson",
+            "“Keep your face always toward the sunshine — and shadows will fall behind you.” — Walt Whitman",
+            "“Just keep swimming.” — Dory, Finding Nemo",
+            "“You can't pour from an empty cup. Take care of yourself first.”",
+            "“It's okay to not be okay.”",
+            "“One step at a time.”",
+            "“Breathe in, breathe out, move on.” — Jimmy Buffett",
+            "“You are exactly where you need to be.”",
+            "“Stars can't shine without darkness.” — D.H. Sidebottom",
+            "“She believed she could, so she did.” — R.S. Grey",
+            "“I am still learning.” — Michelangelo",
+            "“Energy and persistence conquer all things.” — Benjamin Franklin",
+            "“If you're going through hell, keep going.” — Winston Churchill",
+            "“The man who moves a mountain begins by carrying away small stones.” — Confucius",
+            "“Don't count the days, make the days count.” — Muhammad Ali",
+            "“Do something today that your future self will thank you for.” — Sean Patrick Flanery",
+            "“What we think, we become.” — Buddha",
+            "“Be yourself; everyone else is already taken.” — Oscar Wilde",
+            "“Stay close to anything that makes you glad you are alive.” — Hafez",
+            "“Don't let what you cannot do interfere with what you can do.” — John Wooden",
+            "“Knowing yourself is the beginning of all wisdom.” — Aristotle",
+            "“Try to be a rainbow in someone's cloud.” — Maya Angelou",
+            "“Difficult roads often lead to beautiful destinations.”",
+            "“Stop being afraid of what could go wrong, and start being excited about what could go right.” — Tony Robbins",
+            "“If it doesn't challenge you, it doesn't change you.” — Fred Devito",
+            "“Failure is the condiment that gives success its flavor.” — Truman Capote",
+            "“Life shrinks or expands in proportion to one's courage.” — Anaïs Nin",
+            "“Nothing is impossible. The word itself says 'I'm possible.'” — Audrey Hepburn",
+            "“If you're tired, learn to rest, not to quit.” — Banksy",
+            "“Self-care is not selfish. You cannot serve from an empty vessel.” — Eleanor Brownn",
+            "“Sometimes you win, sometimes you learn.” — John C. Maxwell",
+            "“Either you run the day or the day runs you.” — Jim Rohn",
+            "“Surround yourself with people who lift you higher.” — Oprah Winfrey",
+            "“Never bend your head. Always hold it high. Look the world straight in the eye.” — Helen Keller",
+            "“Focus on the step in front of you, not the whole staircase.”",
+            "“When in doubt, breathe out.”",
+            "“You don't have to figure it out today.”",
+            "“Where focus goes, energy flows.” — Tony Robbins",
+            "“Worrying is like paying a debt you don't owe.” — Mark Twain",
+            "“If you change the way you look at things, the things you look at change.” — Wayne Dyer",
+            "“It is during our darkest moments that we must focus to see the light.” — Aristotle",
+            "“Comparison is the thief of joy.” — Theodore Roosevelt",
+            "“Sometimes the smallest step in the right direction ends up being the biggest step of your life.” — Naeem Callaway",
+            "“If opportunity doesn't knock, build a door.” — Milton Berle",
+            "“Light tomorrow with today.” — Elizabeth Barrett Browning",
+            "“Change your thoughts and you change your world.” — Norman Vincent Peale",
+            "“Whatever you are, be a good one.” — Abraham Lincoln",
+            "“Don't let perfect be the enemy of good.” — Voltaire",
+            "“Joy does not simply happen to us. We have to choose joy and keep choosing it every day.” — Henri Nouwen",
+            "“Be gentle with yourself. You're doing the best you can.”",
+            "“Sometimes the bravest thing you can do is just keep showing up.”",
+            "“You are not behind. You are right on time.”",
+            "“Healing is not linear.”",
+            "“Rest is not a reward; it's a requirement.”",
+            "“Take a deep breath. It's just a bad day, not a bad life.”",
+            "“You don't have to have it all figured out to move forward.”",
+            "“Small steps every day.”",
+            "“You are allowed to be both a masterpiece and a work in progress simultaneously.” — Sophia Bush",
+            "“Keep your eyes on the stars and your feet on the ground.” — Theodore Roosevelt",
+            "“When nothing is sure, everything is possible.” — Margaret Drabble",
+            "“Run when you can, walk if you have to, crawl if you must; just never give up.” — Dean Karnazes",
+            "“Believe in yourself and all that you are.” — Christian D. Larson",
+            "“You are not a drop in the ocean. You are the entire ocean in a drop.” — Rumi",
+            "“When the world says, 'Give up,' Hope whispers, 'Try it one more time.'”",
+            "“He who has a why to live for can bear almost any how.” — Friedrich Nietzsche",
+            "“We can't control everything, but we can control how we respond.”",
+            "“There is more in you than you know.” — Kurt Hahn",
+            "“If you can dream it, you can do it.” — Walt Disney",
+            "“All things are difficult before they are easy.” — Thomas Fuller",
+            "“Be kind whenever possible. It is always possible.” — Dalai Lama",
+            "“Walk as if you are kissing the earth with your feet.” — Thich Nhat Hanh",
+            "“Sometimes you have to fall before you can fly.”",
+            "“Worry is a misuse of imagination.” — Dan Zadra",
+            "“When you can't find the sunshine, be the sunshine.”",
+            "“You haven't come this far to only come this far.”",
+            "“Trust the timing of your life.”",
+            "“Don't be afraid to start over. It's a new chance to rebuild what you want.”",
+            "“Some days you just have to create your own sunshine.” — Sam Sundquist",
+            "“Don't compare your beginning to someone else's middle.” — Tim Hiller",
+            "“When in doubt, choose courage.”",
+            "“If you want to be happy, be.” — Leo Tolstoy",
+            "“Just one small positive thought in the morning can change your whole day.” — Dalai Lama",
+            "“Mistakes are proof that you are trying.”",
+            "“It's not whether you get knocked down, it's whether you get up.” — Vince Lombardi",
+            "“Keep showing up for yourself, even when it's hard.”",
+            "“You don't have to be great to start, but you have to start to be great.” — Zig Ziglar",
+            "“Patience is bitter, but its fruit is sweet.” — Jean-Jacques Rousseau",
+            "“Discipline equals freedom.” — Jocko Willink",
+            "“Showing up is half the battle.”",
+            "“Stillness is where creativity and solutions to problems are found.” — Eckhart Tolle",
+            "“Empty your mind, be formless, shapeless — like water.” — Bruce Lee",
+            "“It is okay to slow down, to rest, to take a breath.”",
+            "“Don't apologize for taking up space.”",
+            "“Change is the only constant in life.” — Heraclitus",
+            "“Stay close to the people who feel like sunshine.”",
+            "“Be soft. Do not let the world make you hard.” — Iain S. Thomas",
+            "“We rise by lifting others.” — Robert Ingersoll",
+            "“Hold the vision, trust the process.”",
+            "“When in doubt, be still.”",
+            "“If your dreams don't scare you, they aren't big enough.” — Ellen Johnson Sirleaf",
+            "“Don't shrink. Don't puff up. Stand on your sacred ground.” — Brené Brown",
+            "“Don't let the noise of others' opinions drown out your own inner voice.” — Steve Jobs",
+            "“Even on the bad days, you're still moving forward.”",
+            "“When you focus on the good, the good gets better.”",
+            "“Self-care is how you take your power back.” — Lalah Delia",
+            "“Take pride in how far you've come and faith in how far you can go.”",
+            "“Rest, then rise.”",
+            "“Calm is contagious.”",
+            "“When you can't change the direction of the wind, adjust your sails.”",
+            "“Trust your gut. It's smarter than you think.”",
+            "“The day you plant the seed is not the day you eat the fruit.” — Fabienne Fredrickson",
+            "“When you change the way you breathe, you change the way you feel.”",
+            "“You are still here. You are still going. That's enough.”",
+            "“Choose people who choose you.”",
+            "“You are not alone, and you never have been.”",
+            "“Fear is a liar.”",
+            "“You will never always be motivated. You have to learn to be disciplined.”",
+            "“Progress, not perfection.”",
+            "“You've got this.”",
+            "“You've survived 100% of your worst days so far.”",
+            "“One day at a time.”",
+            "“Breathe deeply. You are exactly where you are supposed to be.”",
+            "“Fear is excitement without breath.” — Robert Heller",
+            "“Give yourself the same grace you give others.”",
+            "“You are doing better than you think.”",
+            "“Slow progress is still progress.”",
+            "“You are allowed to take up space and rest while doing so.”",
+            "“Keep going. Everything you need will come to you at the perfect time.”",
+            "“When the world feels heavy, breathe.”",
+            "“Anxiety is a thought, not a fact.”",
+            "“You are not your anxious thoughts.”",
+            "“Name what you feel, then breathe through it.”",
+            "“Feelings are visitors. Let them come and go.” — Mooji",
+            "“In the middle of difficulty lies opportunity.” — Albert Einstein",
+            "“Gratitude turns what we have into enough.” — Aesop",
+            "“You were not made to merely survive. You were made to live.”",
+            "“Once in a while, take a deep breath. Hold it. Let it go. That's it.”"
+        ];
+        const positiveQuotesLength = positiveQuotes.length;
+        function getPositiveQuote(idx) { return positiveQuotes[idx]; }
+
+        function pickKRandomIndices(total, k) {
+            if (k >= total) {
+                const all = new Array(total);
+                for (let i = 0; i < total; i++) all[i] = i;
+                // Fisher-Yates
+                for (let i = total - 1; i > 0; i--) {
+                    const j = (Math.random() * (i + 1)) | 0;
+                    const tmp = all[i]; all[i] = all[j]; all[j] = tmp;
+                }
+                return all;
+            }
+            const result = new Array(k);
+            const seen = new Set();
+            let n = 0;
+            while (n < k) {
+                const i = (Math.random() * total) | 0;
+                if (!seen.has(i)) {
+                    seen.add(i);
+                    result[n++] = i;
+                }
+            }
+            return result;
+        }
+
+        const quotesFeedEl = document.getElementById('quotesFeed');
+
+        function renderQuotesFeed() {
+            quotesFeedEl.textContent = '';
+            const count = Math.min(positiveQuotesLength, 120);
+            const indices = pickKRandomIndices(positiveQuotesLength, count);
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < indices.length; i++) {
+                const div = document.createElement('div');
+                div.className = 'quotes-feed-item';
+                // Curated quotes already include their own quotation marks + attribution.
+                div.textContent = getPositiveQuote(indices[i]);
+                // Cap stagger so the entire feed has finished animating well before
+                // the user can scroll far — avoids running animations during scroll.
+                const delay = i < 30 ? i * 0.025 : 0.75;
+                div.style.animationDelay = delay + 's';
+                frag.appendChild(div);
+            }
+            quotesFeedEl.appendChild(frag);
+            quotesScreenEl.scrollTop = 0;
+        }
+
+        function openQuotes() {
+            const activeScreen = document.querySelector('.screen.active');
+            if (activeScreen && activeScreen.id !== 'quotesScreen') previousScreen = activeScreen.id;
+            nav('quotesScreen');
+            quotesBtnEl.style.display = 'none';
+            streakBtnEl.style.display = 'none';
+            renderQuotesFeed();
+        }
+
+        function closeQuotes() {
+            nav(previousScreen);
+            if (previousScreen !== 's34') {
+                quotesBtnEl.style.display = '';
+                streakBtnEl.style.display = '';
+            }
+        }
+
         function openStreak() {
-            // Remember which screen was active
             const activeScreen = document.querySelector('.screen.active');
             if (activeScreen && activeScreen.id !== 'streakScreen') previousScreen = activeScreen.id;
             nav('streakScreen');
-            document.getElementById('streakBtn').style.display = 'none';
+            streakBtnEl.style.display = 'none';
+            quotesBtnEl.style.display = 'none';
             renderStreakScreen();
         }
         function closeStreak() {
             nav(previousScreen);
-            // Only show streak button if we aren't returning to an active breathing session
             if (previousScreen !== 's34') {
-                document.getElementById('streakBtn').style.display = '';
+                streakBtnEl.style.display = '';
+                quotesBtnEl.style.display = '';
             }
         }
 
+        const streakQuoteEl = document.getElementById('streakQuote');
+        const streakNumberEl = document.getElementById('streakNumber');
+        const streakChartEl = document.getElementById('streakChart');
+
         function renderStreakScreen() {
             // Quote (non-repeating)
-            const quoteEl = document.getElementById('streakQuote');
             let seenQ = [];
             try { seenQ = JSON.parse(localStorage.getItem('zen_seen_q') || '[]'); } catch (e) { }
-            if (seenQ.length >= motivQuotes.length) seenQ = [];
-            const availQ = motivQuotes.map((_, i) => i).filter(i => !seenQ.includes(i));
-            const qIdx = availQ[Math.floor(Math.random() * availQ.length)];
-            quoteEl.textContent = `"${motivQuotes[qIdx]}"`;
+            if (seenQ.length >= motivQuotesLength) seenQ = [];
+            const seenSet = new Set(seenQ);
+            let qIdx;
+            do { qIdx = (Math.random() * motivQuotesLength) | 0; } while (seenSet.has(qIdx));
+            streakQuoteEl.textContent = '"' + getMotivQuote(qIdx) + '"';
             seenQ.push(qIdx);
             try { localStorage.setItem('zen_seen_q', JSON.stringify(seenQ)); } catch (e) { }
-            setTimeout(() => quoteEl.classList.add('show'), 100);
+            setTimeout(() => streakQuoteEl.classList.add('show'), 100);
 
-            // Streak number
-            const streak = calcStreak();
-            document.getElementById('streakNumber').textContent = streak;
+            // Single shared session log read for streak number + chart
+            const log = getSessionLog();
+            streakNumberEl.textContent = calcStreak(log);
 
             // Chart
-            const chart = document.getElementById('streakChart');
-            chart.innerHTML = '';
-            const days = getLast14Days();
-            const maxMins = Math.max(1, ...days.map(d => d.mins));
-            days.forEach(d => {
+            streakChartEl.textContent = '';
+            const days = getLast14Days(log);
+            let maxMins = 1;
+            for (let i = 0; i < days.length; i++) if (days[i].mins > maxMins) maxMins = days[i].mins;
+
+            const frag = document.createDocumentFragment();
+            const bars = new Array(days.length);
+            for (let i = 0; i < days.length; i++) {
+                const d = days[i];
                 const wrap = document.createElement('div');
                 wrap.className = 'chart-bar-wrap';
                 const minsLabel = document.createElement('div');
@@ -1029,12 +1484,14 @@
                 wrap.appendChild(minsLabel);
                 wrap.appendChild(bar);
                 wrap.appendChild(label);
-                chart.appendChild(wrap);
-                // Animate bar height
+                frag.appendChild(wrap);
+                bars[i] = { bar, target: d.mins > 0 ? Math.max(8, (d.mins / maxMins) * 140) + 'px' : '3px' };
+            }
+            streakChartEl.appendChild(frag);
+            // Single double-rAF to flush all bar heights together
+            requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        bar.style.height = d.mins > 0 ? Math.max(8, (d.mins / maxMins) * 140) + 'px' : '3px';
-                    });
+                    for (let i = 0; i < bars.length; i++) bars[i].bar.style.height = bars[i].target;
                 });
             });
         }
@@ -1043,74 +1500,120 @@
             const intentionEl = document.getElementById('dailyIntention');
             let seen = [];
             try { seen = JSON.parse(localStorage.getItem('zen_seen') || '[]'); } catch (e) { }
-            if (seen.length >= intentions.length) seen = [];
-            let available = intentions.map((_, i) => i).filter(i => !seen.includes(i));
-            const randomIdx = available[Math.floor(Math.random() * available.length)];
-            intentionEl.textContent = `"${intentions[randomIdx]}"`;
+            if (seen.length >= intentionsLength) seen = [];
+            const seenSet = new Set(seen);
+            let randomIdx;
+            do { randomIdx = (Math.random() * intentionsLength) | 0; } while (seenSet.has(randomIdx));
+            intentionEl.textContent = '"' + getIntention(randomIdx) + '"';
             seen.push(randomIdx);
             try { localStorage.setItem('zen_seen', JSON.stringify(seen)); } catch (e) { }
             setTimeout(() => intentionEl.style.opacity = '1', 150);
 
+            // Build picker items in a single fragment to avoid 31 reflows
+            const frag = document.createDocumentFragment();
+            const li30 = document.createElement('li');
+            li30.textContent = '30';
+            frag.appendChild(li30);
             for (let i = 1; i <= 30; i++) {
-                let li = document.createElement('li');
+                const li = document.createElement('li');
                 li.textContent = String(i).padStart(2, '0');
-                picker.appendChild(li);
+                frag.appendChild(li);
             }
+            picker.appendChild(frag);
             requestAnimationFrame(updateScrollVisuals);
         });
 
         function nav(id) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
+            for (let i = 0; i < screenEls.length; i++) screenEls[i].classList.remove('active');
+            const target = document.getElementById(id);
+            if (target) target.classList.add('active');
+        }
+
+        // Picker layout cache — invalidated on resize / orientation change
+        let pickerLayoutValid = false;
+        let pickerCenter = 0;
+        let pickerPaddingTop = 0;
+        let pickerChildren = null;
+
+        function cachePickerLayout() {
+            const kids = picker.children;
+            if (!kids.length) return;
+            pickerChildren = kids;
+            itemHeight = kids[0].offsetHeight;
+            pickerCenter = picker.clientHeight / 2;
+            const cs = getComputedStyle(picker);
+            pickerPaddingTop = parseFloat(cs.paddingTop) || 0;
+            pickerLayoutValid = itemHeight > 0;
         }
 
         function updateScrollVisuals() {
-            if (!itemHeight) itemHeight = picker.children[0].offsetHeight;
+            if (!pickerLayoutValid) {
+                cachePickerLayout();
+                if (!pickerLayoutValid) return;
+            }
             const scrollY = picker.scrollTop;
-            const center = picker.clientHeight / 2;
+            const halfH = itemHeight * 0.5;
+            const len = pickerChildren.length;
             let centerIdx = 0;
             let minDiv = Infinity;
 
-            Array.from(picker.children).forEach((li, i) => {
-                const dist = (li.offsetTop - scrollY + itemHeight / 2) - center;
+            for (let i = 0; i < len; i++) {
+                // Equal-height items: derive offsetTop instead of triggering layout reads
+                const dist = (pickerPaddingTop + i * itemHeight) - scrollY + halfH - pickerCenter;
+                const absDist = dist < 0 ? -dist : dist;
                 const norm = dist / itemHeight;
-                if (Math.abs(dist) < minDiv) { minDiv = Math.abs(dist); centerIdx = i; }
-                li.style.transform = `rotateX(${norm * -30}deg) scale(${Math.max(0.4, 1 - Math.abs(norm) * 0.2)}) translateZ(0)`;
-                li.style.opacity = Math.max(0.1, 1 - Math.abs(norm) * 0.6);
-            });
+                const absNorm = norm < 0 ? -norm : norm;
+                if (absDist < minDiv) { minDiv = absDist; centerIdx = i; }
+                const li = pickerChildren[i];
+                const scale = absNorm * 0.2; // 1 - scale → final
+                li.style.transform = 'rotateX(' + (norm * -30) + 'deg) scale(' + (scale > 0.6 ? 0.4 : 1 - scale) + ') translateZ(0)';
+                const op = 1 - absNorm * 0.6;
+                li.style.opacity = op < 0.1 ? 0.1 : op;
+            }
 
             if (centerIdx !== lastIndex) {
                 if (navigator.vibrate) navigator.vibrate(10);
                 lastIndex = centerIdx;
-                selectedDurationMs = (centerIdx + 1) * 60000;
+                selectedDurationMs = centerIdx === 0 ? 30000 : centerIdx * 60000;
+                pickerUnitEl.textContent = centerIdx === 0 ? 'sec' : 'min';
             }
         }
 
-        picker.addEventListener('scroll', () => requestAnimationFrame(updateScrollVisuals), { passive: true });
+        // Debounce: at most one rAF in flight per scroll burst
+        let scrollPending = false;
+        picker.addEventListener('scroll', () => {
+            if (scrollPending) return;
+            scrollPending = true;
+            requestAnimationFrame(() => {
+                scrollPending = false;
+                updateScrollVisuals();
+            });
+        }, { passive: true });
+
+        window.addEventListener('resize', () => { pickerLayoutValid = false; }, { passive: true });
+        window.addEventListener('orientationchange', () => { pickerLayoutValid = false; }, { passive: true });
 
         let arrowScrolling = false;
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                if (document.getElementById('s1').classList.contains('active')) {
+                if (s1El.classList.contains('active')) {
                     nav('s2');
-                } else if (document.getElementById('s2').classList.contains('active')) {
+                } else if (s2El.classList.contains('active')) {
                     startSession();
                 }
                 return;
             }
 
-            if (!document.getElementById('s2').classList.contains('active')) return;
+            if (!s2El.classList.contains('active')) return;
 
             if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                 e.preventDefault();
-                if (arrowScrolling) return; // skip while a scroll is still settling
+                if (arrowScrolling) return;
                 arrowScrolling = true;
                 const dir = e.key === 'ArrowUp' ? -1 : 1;
-                // Use instant scroll for held keys (repeat), smooth for single taps
                 const mode = e.repeat ? 'instant' : 'smooth';
                 picker.scrollBy({ top: dir * itemHeight, behavior: mode });
-                // Release lock after the item has had time to snap
                 setTimeout(() => { arrowScrolling = false; }, e.repeat ? 80 : 200);
             }
         });
@@ -1118,7 +1621,9 @@
         async function startSession() {
             nav('s34');
             isSessionActive = true;
-            document.getElementById('streakBtn').style.display = 'none';
+            streakBtnEl.style.display = 'none';
+            quotesBtnEl.style.display = 'none';
+            requestWakeLock();
 
             mainCircle.style.transform = 'scale(0.4)';
             breatheText.style.opacity = '1';
@@ -1127,18 +1632,24 @@
             mainCircle.classList.add('animate-breathe');
 
             let textFaded = false;
+            let lastBreatheText = '';
             function loop(now) {
-                // Return immediately if session was ended OR if user navigated away from s34
-                if (!isSessionActive || !document.getElementById('s34').classList.contains('active')) return;
+                if (!isSessionActive || !s34El.classList.contains('active')) return;
 
                 const elapsed = now - start;
-                const p = elapsed % 12000;
 
                 if (!textFaded && elapsed < 26000) {
-                    if (p < 4500) breatheText.textContent = "Inhale";
-                    else if (p < 6000) breatheText.textContent = "Hold";
-                    else if (p < 10500) breatheText.textContent = "Exhale";
-                    else breatheText.textContent = "Hold";
+                    const p = elapsed % 12000;
+                    let target;
+                    if (p < 4500) target = 'Inhale';
+                    else if (p < 6000) target = 'Hold';
+                    else if (p < 10500) target = 'Exhale';
+                    else target = 'Hold';
+                    // Only touch the DOM when the label actually changes
+                    if (target !== lastBreatheText) {
+                        breatheText.textContent = target;
+                        lastBreatheText = target;
+                    }
                 } else if (!textFaded) {
                     breatheText.style.opacity = '0';
                     textFaded = true;
@@ -1152,6 +1663,7 @@
 
         function endSession() {
             isSessionActive = false;
+            releaseWakeLock();
 
             // Log the completed session
             logSession(Math.round(selectedDurationMs / 60000));
@@ -1164,13 +1676,13 @@
             void mainCircle.offsetWidth; // Force Reflow
 
             // Shrink entire container and turn green
-            mainCircle.style.transition = '1.2s ease, background-color 1.2s ease';
+            mainCircle.style.transition = 'transform 1.2s ease, background-color 1.2s ease';
             mainCircle.style.transform = 'scale(0.5)';
             mainCircle.style.backgroundColor = 'var(--success)';
 
             breatheText.style.opacity = '0';
-            document.getElementById('checkSvg').classList.add('active');
-            document.getElementById('s4UI').classList.add('active');
+            checkSvgEl.classList.add('active');
+            s4UIEl.classList.add('active');
         }
 
         function resetToHome() { location.reload(); }
