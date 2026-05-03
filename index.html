@@ -544,6 +544,253 @@
             min-height: 0.9rem;
         }
 
+        /* --- Year Heatmap (GitHub-style) --- */
+        .heatmap-section {
+            width: 100%;
+            max-width: 760px;
+            margin: 2rem auto 1rem;
+        }
+
+        .heatmap-title {
+            font-size: 0.85rem;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.4);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .heatmap-scroll {
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            padding: 0 0.5rem 0.4rem;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+            /* Mobile: keep horizontal pan inside this container — never hijack vertical scroll
+               or trigger pull-to-refresh on Samsung/Chrome Android. */
+            touch-action: pan-x;
+            overscroll-behavior-x: contain;
+        }
+
+        .heatmap-scroll::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .heatmap-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
+        }
+
+        .heatmap-inner {
+            display: inline-block;
+            min-width: 100%;
+        }
+
+        .heatmap-months {
+            display: grid;
+            grid-template-columns: repeat(53, 12px);
+            gap: 3px;
+            font-size: 0.6rem;
+            color: rgba(255, 255, 255, 0.4);
+            margin-bottom: 4px;
+            height: 0.9rem;
+            padding-left: 22px;
+        }
+
+        .heatmap-months span {
+            grid-row: 1;
+            white-space: nowrap;
+        }
+
+        .heatmap-row {
+            display: flex;
+            gap: 3px;
+        }
+
+        .heatmap-daycol {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-size: 0.55rem;
+            color: rgba(255, 255, 255, 0.35);
+            margin-right: 4px;
+            padding: 1px 0;
+            width: 18px;
+        }
+
+        .heatmap-daycol span {
+            height: 12px;
+            line-height: 12px;
+        }
+
+        .heatmap-grid {
+            display: grid;
+            grid-template-rows: repeat(7, 12px);
+            grid-auto-flow: column;
+            grid-auto-columns: 12px;
+            gap: 3px;
+        }
+
+        .heatmap-cell {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.05);
+            transition: transform 0.15s ease;
+        }
+
+        .heatmap-cell.future {
+            background: transparent;
+        }
+
+        .heatmap-cell.l1 {
+            background: #1c4a1e;
+        }
+
+        .heatmap-cell.l2 {
+            background: #2d7d31;
+        }
+
+        .heatmap-cell.l3 {
+            background: #4daf50;
+        }
+
+        .heatmap-cell.l4 {
+            background: #81C784;
+        }
+
+        .heatmap-cell.today {
+            outline: 1px solid rgba(255, 255, 255, 0.6);
+            outline-offset: 1px;
+        }
+
+        .heatmap-legend {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.4);
+            margin-top: 0.6rem;
+        }
+
+        .heatmap-legend .heatmap-cell {
+            width: 10px;
+            height: 10px;
+        }
+
+        /* --- Audio button + popover --- */
+        .audio-btn {
+            position: fixed;
+            bottom: max(env(safe-area-inset-bottom, 18px), 18px);
+            left: 50%;
+            transform: translateX(-50%);
+            /* Above streak / quotes overlays (z-index 200) so audio stays controllable everywhere */
+            z-index: 250;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 2rem;
+            padding: 0.5rem 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .audio-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.3);
+            color: #fff;
+        }
+
+        .audio-btn:active {
+            transform: translateX(-50%) scale(0.94);
+        }
+
+        .audio-btn.on {
+            color: #81C784;
+            border-color: rgba(129, 199, 132, 0.5);
+        }
+
+        .audio-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .audio-popover {
+            position: fixed;
+            bottom: calc(max(env(safe-area-inset-bottom, 18px), 18px) + 50px);
+            left: 50%;
+            transform: translateX(-50%) translateY(8px);
+            z-index: 251;
+            background: rgba(15, 15, 15, 0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 1rem;
+            padding: 0.6rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            justify-content: center;
+            /* Always fit the viewport even on 320px-wide phones */
+            max-width: min(320px, calc(100vw - 24px));
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        /* Solid fallback for browsers / devices without backdrop-filter
+           (older Samsung Internet, older Pixel Chrome on low-RAM devices) */
+        @supports not ((backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px))) {
+            .audio-btn {
+                background: rgba(20, 20, 20, 0.92);
+            }
+
+            .audio-popover {
+                background: rgba(12, 12, 12, 0.97);
+            }
+        }
+
+        .audio-popover.open {
+            opacity: 1;
+            pointer-events: all;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .audio-chip {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem;
+            padding: 0.45rem 0.9rem;
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+            white-space: nowrap;
+        }
+
+        .audio-chip:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .audio-chip.active {
+            background: rgba(129, 199, 132, 0.2);
+            border-color: rgba(129, 199, 132, 0.6);
+            color: #81C784;
+        }
+
         /* ===== TABLET / IPAD (max-width: 1024px) ===== */
         @media screen and (max-width: 1024px) and (orientation: portrait) {
             h1 {
@@ -734,6 +981,66 @@
                 font-size: 0.5rem;
                 min-height: 0.75rem;
             }
+
+            /* Heatmap - smaller cells, allow scroll */
+            .heatmap-section {
+                margin: 1.5rem auto 1rem;
+            }
+
+            .heatmap-grid {
+                grid-template-rows: repeat(7, 10px);
+                grid-auto-columns: 10px;
+                gap: 2px;
+            }
+
+            .heatmap-cell {
+                width: 10px;
+                height: 10px;
+            }
+
+            .heatmap-months {
+                grid-template-columns: repeat(53, 10px);
+                gap: 2px;
+                padding-left: 18px;
+                font-size: 0.55rem;
+            }
+
+            .heatmap-daycol {
+                width: 14px;
+                font-size: 0.5rem;
+                margin-right: 4px;
+            }
+
+            .heatmap-daycol span {
+                height: 10px;
+                line-height: 10px;
+            }
+
+            /* Audio button - keep above home indicator */
+            .audio-btn {
+                bottom: max(env(safe-area-inset-bottom, 14px), 14px);
+                padding: 0.55rem 0.9rem;
+                font-size: 0.78rem;
+                min-height: 36px;
+            }
+
+            /* Popover position must track the audio-btn bottom */
+            .audio-popover {
+                bottom: calc(max(env(safe-area-inset-bottom, 14px), 14px) + 46px);
+                padding: 0.55rem;
+                gap: 0.35rem;
+            }
+
+            /* Bigger tap targets — chips are the primary interaction here */
+            .audio-chip {
+                padding: 0.6rem 0.95rem;
+                font-size: 0.82rem;
+                min-height: 38px;
+                min-width: 44px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
         }
 
         /* Very small phones (iPhone SE, Galaxy A series, etc.) */
@@ -782,6 +1089,40 @@
             .chart-container {
                 height: 110px;
                 gap: 2px;
+            }
+
+            /* Heatmap: tighter cells so a meaningful slice is visible without scrolling */
+            .heatmap-grid {
+                grid-template-rows: repeat(7, 9px);
+                grid-auto-columns: 9px;
+                gap: 2px;
+            }
+
+            .heatmap-cell {
+                width: 9px;
+                height: 9px;
+            }
+
+            .heatmap-months {
+                grid-template-columns: repeat(53, 9px);
+                gap: 2px;
+                padding-left: 16px;
+            }
+
+            .heatmap-daycol {
+                width: 12px;
+                margin-right: 4px;
+            }
+
+            .heatmap-daycol span {
+                height: 9px;
+                line-height: 9px;
+            }
+
+            /* Slightly smaller audio chips so all 6 fit without wrapping awkwardly */
+            .audio-chip {
+                padding: 0.55rem 0.8rem;
+                font-size: 0.78rem;
             }
         }
 
@@ -892,6 +1233,24 @@
             .chart-title {
                 margin-bottom: 0.5rem;
             }
+
+            /* Landscape phones: audio button needs to clear the side notch / nav bar
+               and not collide with primary .btn (Begin / Home) which sits at bottom */
+            .audio-btn {
+                bottom: max(env(safe-area-inset-bottom, 8px), 8px);
+                padding: 0.4rem 0.75rem;
+                font-size: 0.72rem;
+                min-height: 32px;
+            }
+
+            .audio-popover {
+                bottom: calc(max(env(safe-area-inset-bottom, 8px), 8px) + 42px);
+                max-width: min(420px, calc(100vw - 24px));
+            }
+
+            .heatmap-section {
+                margin: 1rem auto 0.5rem;
+            }
         }
     </style>
 </head>
@@ -900,6 +1259,27 @@
 
     <!-- Quotes button -->
     <button class="quotes-btn" id="quotesBtn" onclick="openQuotes()">Quotes</button>
+
+    <!-- Ambient sound button (bottom-center, visible on all screens) -->
+    <button class="audio-btn" id="audioBtn" onclick="toggleAudioPopover()" aria-label="Ambient sound">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M11 5L6 9H2v6h4l5 4V5z" />
+            <path id="audioWave1" d="M15.54 8.46a5 5 0 0 1 0 7.07" style="display:none" />
+            <path id="audioWave2" d="M19.07 4.93a10 10 0 0 1 0 14.14" style="display:none" />
+            <line id="audioMute" x1="23" y1="9" x2="17" y2="15" />
+            <line id="audioMute2" x1="17" y1="9" x2="23" y2="15" />
+        </svg>
+        <span id="audioBtnLabel">Sound</span>
+    </button>
+
+    <div class="audio-popover" id="audioPopover">
+        <button class="audio-chip active" data-sound="off">Off</button>
+        <button class="audio-chip" data-sound="rain">Rain</button>
+        <button class="audio-chip" data-sound="ocean">Ocean</button>
+        <button class="audio-chip" data-sound="brown">Brown noise</button>
+        <button class="audio-chip" data-sound="white">White noise</button>
+    </div>
 
     <!-- Streak button (visible on all screens) -->
     <button class="streak-btn" id="streakBtn" onclick="openStreak()">
@@ -957,8 +1337,33 @@
             <div class="streak-label">day streak</div>
         </div>
         <div class="chart-section">
-            <div class="chart-title">Last 14 Days</div>
+            <div class="chart-title">Last 7 Days</div>
             <div class="chart-container" id="streakChart"></div>
+        </div>
+        <div class="heatmap-section">
+            <div class="heatmap-title">Past Year</div>
+            <div class="heatmap-scroll">
+                <div class="heatmap-inner">
+                    <div class="heatmap-months" id="heatmapMonths"></div>
+                    <div class="heatmap-row">
+                        <div class="heatmap-daycol">
+                            <span>Mon</span>
+                            <span>Wed</span>
+                            <span>Fri</span>
+                        </div>
+                        <div class="heatmap-grid" id="heatmapGrid"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="heatmap-legend">
+                <span>Less</span>
+                <span class="heatmap-cell"></span>
+                <span class="heatmap-cell l1"></span>
+                <span class="heatmap-cell l2"></span>
+                <span class="heatmap-cell l3"></span>
+                <span class="heatmap-cell l4"></span>
+                <span>More</span>
+            </div>
         </div>
     </div>
 
@@ -1116,7 +1521,7 @@
             }
             return streak;
         }
-        function getLast14Days(log) {
+        function getLast7Days(log) {
             if (!log) log = getSessionLog();
             const minsByDate = Object.create(null);
             for (let i = 0; i < log.length; i++) {
@@ -1127,13 +1532,57 @@
             const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            for (let i = 13; i >= 0; i--) {
+            for (let i = 6; i >= 0; i--) {
                 const d = new Date(today);
                 d.setDate(today.getDate() - i);
                 const key = dayKey(d);
                 days.push({ key, label: dayNames[d.getDay()], mins: minsByDate[key] || 0, isToday: i === 0 });
             }
             return days;
+        }
+
+        function getYearHeatmap(log) {
+            if (!log) log = getSessionLog();
+            const minsByDate = Object.create(null);
+            for (let i = 0; i < log.length; i++) {
+                const s = log[i];
+                minsByDate[s.date] = (minsByDate[s.date] || 0) + s.mins;
+            }
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayKey = dayKey(today);
+
+            // End column = the Saturday on/after today; start = 53 weeks before that Sunday.
+            const endCol = new Date(today);
+            endCol.setDate(today.getDate() + (6 - today.getDay()));
+            const start = new Date(endCol);
+            start.setDate(endCol.getDate() - (53 * 7) + 1);
+
+            const cells = [];
+            const monthLabels = new Array(53).fill('');
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            let lastLabeledMonth = -1;
+
+            for (let week = 0; week < 53; week++) {
+                const colStart = new Date(start);
+                colStart.setDate(start.getDate() + week * 7);
+                if (colStart.getMonth() !== lastLabeledMonth) {
+                    monthLabels[week] = monthNames[colStart.getMonth()];
+                    lastLabeledMonth = colStart.getMonth();
+                }
+                for (let day = 0; day < 7; day++) {
+                    const d = new Date(start);
+                    d.setDate(start.getDate() + week * 7 + day);
+                    if (d > today) {
+                        cells.push({ future: true, week, day });
+                    } else {
+                        const key = dayKey(d);
+                        const mins = minsByDate[key] || 0;
+                        cells.push({ date: key, mins, week, day, isToday: key === todayKey });
+                    }
+                }
+            }
+            return { cells, monthLabels };
         }
 
         function updateStreakBtn() {
@@ -1442,6 +1891,52 @@
         const streakQuoteEl = document.getElementById('streakQuote');
         const streakNumberEl = document.getElementById('streakNumber');
         const streakChartEl = document.getElementById('streakChart');
+        const heatmapGridEl = document.getElementById('heatmapGrid');
+        const heatmapMonthsEl = document.getElementById('heatmapMonths');
+        const heatmapScrollEl = document.querySelector('.heatmap-scroll');
+
+        function heatmapLevel(mins) {
+            if (mins <= 0) return 0;
+            if (mins < 5) return 1;
+            if (mins < 15) return 2;
+            if (mins < 30) return 3;
+            return 4;
+        }
+
+        function renderHeatmap(log) {
+            const { cells, monthLabels } = getYearHeatmap(log);
+
+            heatmapMonthsEl.textContent = '';
+            const mfrag = document.createDocumentFragment();
+            for (let w = 0; w < monthLabels.length; w++) {
+                const span = document.createElement('span');
+                span.style.gridColumn = (w + 1) + ' / span 1';
+                span.textContent = monthLabels[w];
+                mfrag.appendChild(span);
+            }
+            heatmapMonthsEl.appendChild(mfrag);
+
+            heatmapGridEl.textContent = '';
+            const gfrag = document.createDocumentFragment();
+            for (let i = 0; i < cells.length; i++) {
+                const c = cells[i];
+                const div = document.createElement('div');
+                if (c.future) {
+                    div.className = 'heatmap-cell future';
+                } else {
+                    const lvl = heatmapLevel(c.mins);
+                    div.className = 'heatmap-cell' + (lvl > 0 ? ' l' + lvl : '') + (c.isToday ? ' today' : '');
+                    div.title = c.date + (c.mins > 0 ? ' — ' + c.mins + ' min' : ' — no session');
+                }
+                gfrag.appendChild(div);
+            }
+            heatmapGridEl.appendChild(gfrag);
+
+            // Mobile: scroll to today (rightmost column) so users see current activity first
+            requestAnimationFrame(() => {
+                if (heatmapScrollEl) heatmapScrollEl.scrollLeft = heatmapScrollEl.scrollWidth;
+            });
+        }
 
         function renderStreakScreen() {
             // Quote (non-repeating)
@@ -1462,7 +1957,7 @@
 
             // Chart
             streakChartEl.textContent = '';
-            const days = getLast14Days(log);
+            const days = getLast7Days(log);
             let maxMins = 1;
             for (let i = 0; i < days.length; i++) if (days[i].mins > maxMins) maxMins = days[i].mins;
 
@@ -1494,7 +1989,223 @@
                     for (let i = 0; i < bars.length; i++) bars[i].bar.style.height = bars[i].target;
                 });
             });
+
+            // Year heatmap
+            renderHeatmap(log);
         }
+
+        /* --- Ambient sound (procedural Web Audio) --- */
+        const audioBtnEl = document.getElementById('audioBtn');
+        const audioBtnLabelEl = document.getElementById('audioBtnLabel');
+        const audioPopoverEl = document.getElementById('audioPopover');
+        const audioWave1El = document.getElementById('audioWave1');
+        const audioWave2El = document.getElementById('audioWave2');
+        const audioMuteEl = document.getElementById('audioMute');
+        const audioMute2El = document.getElementById('audioMute2');
+
+        const SOUND_LABELS = { off: 'Sound', rain: 'Rain', ocean: 'Ocean', brown: 'Brown', white: 'White' };
+
+        let audioCtx = null;
+        let masterGain = null;
+        let activeNodes = null;
+        let currentSound = 'off';
+        let popoverOpen = false;
+
+        function ensureCtx() {
+            if (!audioCtx) {
+                const Ctx = window.AudioContext || window.webkitAudioContext;
+                if (!Ctx) return null;
+                audioCtx = new Ctx();
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.18;
+                masterGain.connect(audioCtx.destination);
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            return audioCtx;
+        }
+
+        function buildNoiseBuffer(ctx, kind) {
+            const length = ctx.sampleRate * 4;
+            const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
+            for (let ch = 0; ch < 2; ch++) {
+                const data = buffer.getChannelData(ch);
+                if (kind === 'white') {
+                    for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+                } else {
+                    // brown noise (used for brown + ocean + rain base)
+                    let last = 0;
+                    for (let i = 0; i < length; i++) {
+                        const w = Math.random() * 2 - 1;
+                        last = (last + 0.02 * w) / 1.02;
+                        data[i] = last * 3.5;
+                    }
+                }
+            }
+            return buffer;
+        }
+
+        function fadeAndStop(nodes) {
+            if (!nodes) return;
+            const ctx = audioCtx;
+            const t = ctx.currentTime;
+            try {
+                nodes.gain.gain.cancelScheduledValues(t);
+                nodes.gain.gain.setValueAtTime(nodes.gain.gain.value, t);
+                nodes.gain.gain.linearRampToValueAtTime(0, t + 0.4);
+            } catch (e) { }
+            setTimeout(() => {
+                if (nodes.src) { try { nodes.src.stop(); } catch (e) { } }
+                if (nodes.lfo) { try { nodes.lfo.stop(); } catch (e) { } }
+            }, 450);
+        }
+
+        function startAmbient(kind) {
+            const ctx = ensureCtx();
+            if (!ctx) return null;
+            const gain = ctx.createGain();
+            gain.gain.value = 0;
+            gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.6);
+            gain.connect(masterGain);
+
+            if (kind === 'white' || kind === 'brown') {
+                const src = ctx.createBufferSource();
+                src.buffer = buildNoiseBuffer(ctx, kind);
+                src.loop = true;
+                src.connect(gain);
+                src.start();
+                return { src, gain };
+            }
+
+            if (kind === 'rain') {
+                const src = ctx.createBufferSource();
+                src.buffer = buildNoiseBuffer(ctx, 'white');
+                src.loop = true;
+                const hp = ctx.createBiquadFilter();
+                hp.type = 'highpass';
+                hp.frequency.value = 900;
+                const lp = ctx.createBiquadFilter();
+                lp.type = 'lowpass';
+                lp.frequency.value = 5500;
+                src.connect(hp).connect(lp).connect(gain);
+                src.start();
+                return { src, gain };
+            }
+
+            if (kind === 'ocean') {
+                const src = ctx.createBufferSource();
+                src.buffer = buildNoiseBuffer(ctx, 'brown');
+                src.loop = true;
+                const lp = ctx.createBiquadFilter();
+                lp.type = 'lowpass';
+                lp.frequency.value = 550;
+                // slow swell: LFO modulates a gain stage between waves
+                const swell = ctx.createGain();
+                swell.gain.value = 0.55;
+                const lfo = ctx.createOscillator();
+                lfo.frequency.value = 0.13;
+                const lfoAmp = ctx.createGain();
+                lfoAmp.gain.value = 0.4;
+                lfo.connect(lfoAmp).connect(swell.gain);
+                src.connect(lp).connect(swell).connect(gain);
+                src.start();
+                lfo.start();
+                return { src, gain, lfo };
+            }
+
+            return null;
+        }
+
+        function setSound(kind) {
+            if (kind === currentSound) return;
+            // tear down
+            if (activeNodes) fadeAndStop(activeNodes);
+            activeNodes = null;
+            currentSound = kind;
+
+            // Update chips
+            const chips = audioPopoverEl.querySelectorAll('.audio-chip');
+            for (let i = 0; i < chips.length; i++) {
+                chips[i].classList.toggle('active', chips[i].dataset.sound === kind);
+            }
+            // Update button state
+            const isOn = kind !== 'off';
+            audioBtnEl.classList.toggle('on', isOn);
+            audioBtnLabelEl.textContent = SOUND_LABELS[kind] || 'Sound';
+            audioWave1El.style.display = isOn ? '' : 'none';
+            audioWave2El.style.display = isOn ? '' : 'none';
+            audioMuteEl.style.display = isOn ? 'none' : '';
+            audioMute2El.style.display = isOn ? 'none' : '';
+
+            // Persist
+            try { localStorage.setItem('zen_sound', kind); } catch (e) { }
+
+            if (kind === 'off') return;
+
+            activeNodes = startAmbient(kind);
+        }
+
+        function toggleAudioPopover() {
+            popoverOpen = !popoverOpen;
+            audioPopoverEl.classList.toggle('open', popoverOpen);
+        }
+
+        // Close popover on outside tap
+        document.addEventListener('click', (e) => {
+            if (!popoverOpen) return;
+            if (audioPopoverEl.contains(e.target) || audioBtnEl.contains(e.target)) return;
+            popoverOpen = false;
+            audioPopoverEl.classList.remove('open');
+        });
+
+        // Chip clicks
+        audioPopoverEl.addEventListener('click', (e) => {
+            const chip = e.target.closest('.audio-chip');
+            if (!chip) return;
+            setSound(chip.dataset.sound);
+            // Close popover after selection so the meditative UI returns to its quiet state
+            setTimeout(() => {
+                popoverOpen = false;
+                audioPopoverEl.classList.remove('open');
+            }, 200);
+        });
+
+        // Resume suspended audio context when returning from background (iOS Safari, Chrome Android)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible') return;
+            if (audioCtx && audioCtx.state === 'suspended' && currentSound !== 'off') {
+                audioCtx.resume();
+            }
+        });
+
+        // Restore sound preference (but only resume audio after a user gesture)
+        let pendingRestoreSound = null;
+        try {
+            const saved = localStorage.getItem('zen_sound');
+            if (saved && saved !== 'off' && SOUND_LABELS[saved]) {
+                pendingRestoreSound = saved;
+                // Reflect chip selection visually without starting audio yet
+                const chips = audioPopoverEl.querySelectorAll('.audio-chip');
+                for (let i = 0; i < chips.length; i++) {
+                    chips[i].classList.toggle('active', chips[i].dataset.sound === saved);
+                }
+                audioBtnEl.classList.add('on');
+                audioBtnLabelEl.textContent = SOUND_LABELS[saved];
+                audioWave1El.style.display = '';
+                audioWave2El.style.display = '';
+                audioMuteEl.style.display = 'none';
+                audioMute2El.style.display = 'none';
+            }
+        } catch (e) { }
+
+        function resumePendingSoundOnGesture() {
+            if (!pendingRestoreSound) return;
+            const k = pendingRestoreSound;
+            pendingRestoreSound = null;
+            currentSound = 'off';
+            setSound(k);
+        }
+        document.addEventListener('pointerdown', resumePendingSoundOnGesture, { once: true });
+        document.addEventListener('keydown', resumePendingSoundOnGesture, { once: true });
 
         document.addEventListener('DOMContentLoaded', () => {
             const intentionEl = document.getElementById('dailyIntention');
