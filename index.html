@@ -14,6 +14,22 @@
             --bg: #000000;
             --fg: #FFFFFF;
             --success: #66BB6A;
+            --success-soft: rgba(129, 199, 132, 0.7);
+
+            /* Layered surfaces — keeps the dark UI consistent across platforms */
+            --surface-1: rgba(255, 255, 255, 0.03);
+            --surface-2: rgba(255, 255, 255, 0.06);
+            --surface-3: rgba(255, 255, 255, 0.1);
+            --hairline: rgba(255, 255, 255, 0.1);
+            --hairline-strong: rgba(255, 255, 255, 0.22);
+
+            /* Motion tokens — used to standardize transitions across desktop and mobile */
+            --dur-fast: 0.15s;
+            --dur-base: 0.25s;
+            --dur-slow: 0.45s;
+            --ease-fluid: cubic-bezier(0.4, 0, 0.2, 1);   /* Material standard */
+            --ease-out-soft: cubic-bezier(0.25, 0.1, 0.25, 1);
+            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* gentle overshoot */
         }
 
         * {
@@ -25,13 +41,64 @@
         body,
         html {
             width: 100%;
+            /* 100vh fallback for iOS Safari < 16 / older Android browsers,
+               then 100dvh on engines that understand it (modern Safari, Chrome, Edge) */
+            height: 100vh;
             height: 100dvh;
+            min-height: -webkit-fill-available; /* iOS Safari belt-and-suspenders */
             background-color: var(--bg);
             color: var(--fg);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            /* System font stack covers macOS / iOS / Windows / Chromebook / Android */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+                Ubuntu, Cantarell, Helvetica, Arial, sans-serif;
             overflow: hidden;
             user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
             -webkit-tap-highlight-color: transparent;
+            /* Stop mobile browsers from auto-resizing text in landscape (iOS) or after rotation (Android) */
+            -webkit-text-size-adjust: 100%;
+            -moz-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+            /* Crisp text on Retina (Mac/iOS), high-DPI Pixel/Samsung, and ClearType (Windows) */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+            /* Prevent iOS pinch-zoom and Android double-tap-zoom on the meditation surface */
+            touch-action: manipulation;
+            /* Avoid Android pull-to-refresh on the body itself */
+            overscroll-behavior: none;
+        }
+
+        /* Removes the 300ms tap delay on touch devices and disables long-press selection
+           specifically for tappable controls. Body-level touch-action also prevents pinch zoom. */
+        button,
+        .audio-chip,
+        .picker-overlay,
+        .stat-card,
+        .heatmap-cell {
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+        }
+
+        /* Focus rings: only show when navigating by keyboard (Chromebook / Windows / Mac power users),
+           invisible on mouse click and touch tap. Provides accessibility without leaving sticky rings. */
+        :focus {
+            outline: none;
+        }
+
+        button:focus-visible,
+        .audio-chip:focus-visible,
+        .stat-card:focus-visible,
+        .picker-overlay:focus-visible,
+        .audio-slider:focus-visible {
+            outline: 2px solid var(--success-soft);
+            outline-offset: 3px;
+            border-radius: inherit;
+        }
+
+        .audio-slider:focus-visible {
+            outline-offset: 6px;
         }
 
         .screen {
@@ -89,21 +156,35 @@
             font-size: 1.2rem;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
             margin-top: auto;
             margin-bottom: 15vh;
+            /* Baseline shadow + halo (zero-blur halo so the hover transition is smooth) */
+            box-shadow:
+                0 1px 0 rgba(0, 0, 0, 0.08),
+                0 0 0 0 rgba(255, 255, 255, 0);
+            transition:
+                transform var(--dur-fast) var(--ease-fluid),
+                box-shadow var(--dur-base) var(--ease-fluid),
+                background-color var(--dur-base) var(--ease-fluid);
         }
 
-        .btn:hover {
-            background: #222222;
-            /* Dark grey */
-            color: var(--fg);
-            /* White text */
+        @media (hover: hover) and (pointer: fine) {
+            .btn:hover {
+                /* Lift + warm halo. Avoids the jarring black-to-grey flip the design used to do. */
+                transform: translateY(-2px);
+                box-shadow:
+                    0 12px 28px rgba(255, 255, 255, 0.14),
+                    0 0 0 1px rgba(255, 255, 255, 0.35);
+                background-color: #f5f5f7;
+            }
         }
 
         .btn:active {
-            transform: scale(0.9);
-            /* Makes the button reduce in size when clicked */
+            transform: translateY(0) scale(0.96);
+            transition-duration: var(--dur-fast);
+            box-shadow:
+                0 2px 6px rgba(255, 255, 255, 0.08),
+                0 0 0 1px rgba(255, 255, 255, 0.2);
         }
 
         /* Buttery 3D Scroll Picker */
@@ -157,18 +238,61 @@
             height: 140px;
             pointer-events: all;
             cursor: pointer;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: 1px solid var(--hairline);
+            border-bottom: 1px solid var(--hairline);
             display: flex;
             align-items: center;
             justify-content: flex-end;
             padding-right: 1.5rem;
             border-radius: 0.5rem;
-            transition: background 0.2s;
+            transition:
+                background-color var(--dur-base) var(--ease-fluid),
+                border-color var(--dur-base) var(--ease-fluid);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .picker-overlay:hover {
+                background: rgba(255, 255, 255, 0.04);
+                border-top-color: var(--hairline-strong);
+                border-bottom-color: var(--hairline-strong);
+            }
         }
 
         .picker-overlay:active {
-            background: rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Holds the circle and the (fixed-size) progress ring around it */
+        .circle-stage {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Progress ring sits behind the circle at its maximum scale boundary */
+        .progress-ring {
+            position: absolute;
+            width: clamp(280px, 78vw, 540px);
+            height: clamp(280px, 78vw, 540px);
+            pointer-events: none;
+            transform: rotate(-90deg);
+        }
+
+        .progress-track {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.06);
+            stroke-width: 1.5;
+        }
+
+        .progress-fill {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.45);
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-dasharray: 603.19; /* 2*PI*96 */
+            stroke-dashoffset: 603.19;
+            transition: stroke-dashoffset 0.6s linear, opacity 0.8s ease;
         }
 
         /* Container scales rapidly (GPU Accelerated Breathing) */
@@ -275,14 +399,35 @@
             pointer-events: all;
         }
 
+        .s4-summary {
+            font-size: 1rem;
+            font-weight: 300;
+            color: rgba(255, 255, 255, 0.55);
+            letter-spacing: 0.04em;
+            text-align: center;
+            max-width: 85%;
+            line-height: 1.5;
+            opacity: 0;
+            transition: opacity 1s ease 0.6s;
+        }
+
+        .s4-ui.active .s4-summary {
+            opacity: 1;
+        }
+
+        .s4-summary strong {
+            color: var(--success);
+            font-weight: 500;
+        }
+
         /* --- Quotes Button (top-left, all screens) --- */
         .quotes-btn {
             position: fixed;
             top: max(env(safe-area-inset-top, 12px), 12px);
             left: 16px;
             z-index: 100;
-            background: none;
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(0, 0, 0, 0);
+            border: 1px solid var(--hairline);
             border-radius: 2rem;
             padding: 0.5rem 1rem;
             color: rgba(255, 255, 255, 0.7);
@@ -290,26 +435,38 @@
             font-weight: 500;
             letter-spacing: 0.04em;
             cursor: pointer;
-            transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
             display: flex;
             align-items: center;
+            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+            transition:
+                background-color var(--dur-base) var(--ease-fluid),
+                color var(--dur-base) var(--ease-fluid),
+                border-color var(--dur-base) var(--ease-fluid),
+                transform var(--dur-fast) var(--ease-fluid),
+                box-shadow var(--dur-base) var(--ease-fluid);
         }
 
-        .quotes-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.35);
-            color: #fff;
+        @media (hover: hover) and (pointer: fine) {
+            .quotes-btn:hover {
+                background: var(--surface-3);
+                border-color: var(--hairline-strong);
+                color: #fff;
+                transform: scale(1.04);
+                box-shadow: 0 4px 14px rgba(255, 255, 255, 0.06);
+            }
         }
 
         .quotes-btn:active {
-            transform: scale(0.92);
+            transform: scale(0.94);
+            transition-duration: var(--dur-fast);
         }
 
         /* --- Quotes Screen --- */
         .quotes-screen {
             overflow-y: auto;
             justify-content: flex-start;
-            padding: 6vh 1.5rem 4vh;
+            /* Bottom padding reserves space for the fixed audio-btn so the last quote isn't hidden under it */
+            padding: 6vh 1.5rem calc(max(env(safe-area-inset-bottom, 18px), 18px) + 70px);
             z-index: 200;
             /* Fully obscure underlying screens */
             background-color: var(--bg);
@@ -362,8 +519,8 @@
             top: max(env(safe-area-inset-top, 12px), 12px);
             right: 16px;
             z-index: 100;
-            background: none;
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(0, 0, 0, 0);
+            border: 1px solid var(--hairline);
             border-radius: 2rem;
             padding: 0.5rem 1rem;
             color: rgba(255, 255, 255, 0.7);
@@ -371,20 +528,31 @@
             font-weight: 500;
             letter-spacing: 0.04em;
             cursor: pointer;
-            transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
             display: flex;
             align-items: center;
             gap: 0.4rem;
+            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+            transition:
+                background-color var(--dur-base) var(--ease-fluid),
+                color var(--dur-base) var(--ease-fluid),
+                border-color var(--dur-base) var(--ease-fluid),
+                transform var(--dur-fast) var(--ease-fluid),
+                box-shadow var(--dur-base) var(--ease-fluid);
         }
 
-        .streak-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.35);
-            color: #fff;
+        @media (hover: hover) and (pointer: fine) {
+            .streak-btn:hover {
+                background: var(--surface-3);
+                border-color: var(--hairline-strong);
+                color: #fff;
+                transform: scale(1.04);
+                box-shadow: 0 4px 14px rgba(255, 255, 255, 0.06);
+            }
         }
 
         .streak-btn:active {
-            transform: scale(0.92);
+            transform: scale(0.94);
+            transition-duration: var(--dur-fast);
         }
 
         .streak-btn svg {
@@ -396,35 +564,51 @@
         .streak-screen {
             overflow-y: auto;
             justify-content: flex-start;
-            padding: 6vh 1.5rem 4vh;
+            /* Bottom padding reserves space for the fixed audio-btn so the heatmap legend isn't hidden under it */
+            padding: 6vh 1.5rem calc(max(env(safe-area-inset-bottom, 18px), 18px) + 70px);
             z-index: 200;
             /* Fully obscure underlying screens */
             background-color: var(--bg);
+            /* Smooth momentum scroll on iOS/older WebKit, prevent pull-to-refresh on Android */
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: contain;
         }
 
         .streak-back {
             position: absolute;
             top: max(env(safe-area-inset-top, 12px), 12px);
             left: 16px;
-            background: none;
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(0, 0, 0, 0);
+            border: 1px solid var(--hairline);
             border-radius: 2rem;
             padding: 0.5rem 1rem;
             color: rgba(255, 255, 255, 0.7);
             font-size: 0.85rem;
             font-weight: 500;
             cursor: pointer;
-            transition: background 0.2s, color 0.2s, transform 0.2s;
             z-index: 10;
+            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+            transition:
+                background-color var(--dur-base) var(--ease-fluid),
+                color var(--dur-base) var(--ease-fluid),
+                border-color var(--dur-base) var(--ease-fluid),
+                transform var(--dur-fast) var(--ease-fluid),
+                box-shadow var(--dur-base) var(--ease-fluid);
         }
 
-        .streak-back:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
+        @media (hover: hover) and (pointer: fine) {
+            .streak-back:hover {
+                background: var(--surface-3);
+                border-color: var(--hairline-strong);
+                color: #fff;
+                transform: scale(1.04) translateX(-1px);
+                box-shadow: 0 4px 14px rgba(255, 255, 255, 0.06);
+            }
         }
 
         .streak-back:active {
-            transform: scale(0.92);
+            transform: scale(0.94);
+            transition-duration: var(--dur-fast);
         }
 
         .streak-quote {
@@ -465,6 +649,66 @@
             font-weight: 400;
             color: rgba(255, 255, 255, 0.45);
             letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-top: 0.3rem;
+        }
+
+        /* --- Stats panel --- */
+        .streak-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.6rem;
+            width: 100%;
+            max-width: 480px;
+            margin: 1.4rem auto 0.5rem;
+            padding: 0 0.5rem;
+        }
+
+        .stat-card {
+            background: var(--surface-1);
+            border: 1px solid var(--surface-2);
+            border-radius: 0.85rem;
+            padding: 0.85rem 0.5rem 0.7rem;
+            text-align: center;
+            /* Allow grid item to shrink below content width on small phones */
+            min-width: 0;
+            overflow: hidden;
+            box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+            transition:
+                background-color var(--dur-base) var(--ease-fluid),
+                border-color var(--dur-base) var(--ease-fluid),
+                transform var(--dur-base) var(--ease-fluid),
+                box-shadow var(--dur-base) var(--ease-fluid);
+        }
+
+        .stat-value {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: clip;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .stat-card:hover {
+                background: var(--surface-2);
+                border-color: var(--hairline);
+                transform: translateY(-2px);
+                box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+            }
+        }
+
+        .stat-value {
+            font-size: clamp(1.4rem, 5vw, 1.8rem);
+            font-weight: 300;
+            color: rgba(255, 255, 255, 0.95);
+            line-height: 1.1;
+            letter-spacing: -0.01em;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.4);
+            letter-spacing: 0.08em;
             text-transform: uppercase;
             margin-top: 0.3rem;
         }
@@ -562,6 +806,7 @@
         }
 
         .heatmap-scroll {
+            position: relative;
             overflow-x: auto;
             overflow-y: hidden;
             -webkit-overflow-scrolling: touch;
@@ -572,6 +817,12 @@
                or trigger pull-to-refresh on Samsung/Chrome Android. */
             touch-action: pan-x;
             overscroll-behavior-x: contain;
+            /* Edge fade hints that there's more to scroll. Mask is purely visual; cells under
+               the fade remain interactable. Mask both sides since we auto-scroll to today. */
+            -webkit-mask-image: linear-gradient(to right,
+                transparent 0%, black 16px, black calc(100% - 16px), transparent 100%);
+            mask-image: linear-gradient(to right,
+                transparent 0%, black 16px, black calc(100% - 16px), transparent 100%);
         }
 
         .heatmap-scroll::-webkit-scrollbar {
@@ -637,29 +888,30 @@
             width: 12px;
             height: 12px;
             border-radius: 2px;
-            background: rgba(255, 255, 255, 0.05);
-            transition: transform 0.15s ease;
+            background: var(--surface-1);
+            transition:
+                transform var(--dur-fast) var(--ease-fluid),
+                filter var(--dur-fast) var(--ease-fluid);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .heatmap-cell:not(.future):hover {
+                transform: scale(1.5);
+                filter: brightness(1.25);
+                /* Keep it on top of neighbors during the scale */
+                position: relative;
+                z-index: 5;
+            }
         }
 
         .heatmap-cell.future {
             background: transparent;
         }
 
-        .heatmap-cell.l1 {
-            background: #1c4a1e;
-        }
-
-        .heatmap-cell.l2 {
-            background: #2d7d31;
-        }
-
-        .heatmap-cell.l3 {
-            background: #4daf50;
-        }
-
-        .heatmap-cell.l4 {
-            background: #81C784;
-        }
+        .heatmap-cell.l1 { background: #1c4a1e; }
+        .heatmap-cell.l2 { background: #2d7d31; }
+        .heatmap-cell.l3 { background: #4daf50; }
+        .heatmap-cell.l4 { background: #81C784; }
 
         .heatmap-cell.today {
             outline: 1px solid rgba(255, 255, 255, 0.6);
@@ -682,17 +934,28 @@
         }
 
         /* --- Audio button + popover --- */
-        .audio-btn {
+        /* Wrapper anchors the button to the bottom-center and hosts the
+           absolute-positioned slide-to-mute rail to the button's left. */
+        .audio-control {
             position: fixed;
             bottom: max(env(safe-area-inset-bottom, 18px), 18px);
             left: 50%;
             transform: translateX(-50%);
-            /* Above streak / quotes overlays (z-index 200) so audio stays controllable everywhere */
             z-index: 250;
+            display: flex;
+            align-items: center;
+        }
+
+        .audio-btn {
+            position: relative;
+            /* Drag offset (set inline by JS during hold-to-mute), composed with
+               hover/active transforms below via CSS var so they don't conflict. */
+            --drag-x: 0px;
+            transform: translateX(var(--drag-x));
             background: rgba(0, 0, 0, 0.4);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            border: 1px solid var(--hairline);
             border-radius: 2rem;
             padding: 0.5rem 0.9rem;
             color: rgba(255, 255, 255, 0.7);
@@ -700,20 +963,61 @@
             font-weight: 500;
             letter-spacing: 0.04em;
             cursor: pointer;
-            transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
             display: flex;
             align-items: center;
             gap: 0.4rem;
+            /* Stabilize width so toggling labels (Sound → Birds → Brown) doesn't reflow */
+            min-width: 110px;
+            /* Stabilize height too, so the rail (also 38px) lines up flush
+               when the button slides over it at the end of the drag. */
+            min-height: 38px;
+            justify-content: center;
+            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+            /* Suppress iOS long-press selection / callout — we own this gesture. */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: none;
+            transition:
+                background-color var(--dur-base) var(--ease-fluid),
+                color var(--dur-base) var(--ease-fluid),
+                border-color var(--dur-base) var(--ease-fluid),
+                transform var(--dur-base) var(--ease-spring),
+                box-shadow var(--dur-base) var(--ease-fluid),
+                opacity var(--dur-base) var(--ease-fluid);
         }
 
-        .audio-btn:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.3);
-            color: #fff;
+        .audio-btn span {
+            min-width: 40px;
+            text-align: left;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .audio-btn:hover {
+                background: rgba(255, 255, 255, 0.08);
+                border-color: var(--hairline-strong);
+                color: #fff;
+                transform: translateX(var(--drag-x)) translateY(-2px);
+                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+            }
         }
 
         .audio-btn:active {
-            transform: translateX(-50%) scale(0.94);
+            transform: translateX(var(--drag-x)) scale(0.94);
+        }
+
+        /* While dragging, the button must follow the finger 1-to-1 — strip the
+           transform transition (snap-back springs in only after release). */
+        .audio-control.dragging .audio-btn,
+        .audio-control.dragging .audio-btn:hover,
+        .audio-control.dragging .audio-btn:active {
+            transform: translateX(var(--drag-x));
+            transition:
+                background-color var(--dur-base) var(--ease-fluid),
+                color var(--dur-base) var(--ease-fluid),
+                border-color var(--dur-base) var(--ease-fluid),
+                box-shadow var(--dur-base) var(--ease-fluid),
+                opacity var(--dur-base) var(--ease-fluid);
         }
 
         .audio-btn.on {
@@ -721,32 +1025,315 @@
             border-color: rgba(129, 199, 132, 0.5);
         }
 
+        /* Past the mute threshold — the button signals commit-on-release */
+        .audio-btn.armed {
+            color: #ffb4b4;
+            border-color: rgba(244, 67, 54, 0.55);
+            background: rgba(244, 67, 54, 0.16);
+        }
+
         .audio-btn svg {
             width: 14px;
             height: 14px;
+        }
+
+        /* Slide-to-mute rail — sits to the left of the button, hidden until
+           the user starts a hold gesture, then expands in. */
+        .audio-mute-track {
+            position: absolute;
+            top: 50%;
+            right: calc(100% + 8px);
+            /* Width and shape mirror the audio button so that, at full drag,
+               the button slides exactly on top of the rail and they merge
+               into a single pill — no part of the rail "hangs out" beyond
+               the button's edge. */
+            height: 38px;
+            width: 110px;
+            border-radius: 2rem;
+            background: rgba(0, 0, 0, 0.42);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--hairline);
+            overflow: hidden;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-50%) translateX(14px) scale(0.92);
+            transform-origin: 100% 50%;
+            transition:
+                opacity 0.22s var(--ease-fluid),
+                transform 0.34s var(--ease-spring),
+                background-color 0.2s var(--ease-fluid),
+                border-color 0.2s var(--ease-fluid);
+        }
+
+        .audio-mute-track.active {
+            opacity: 1;
+            transform: translateY(-50%) translateX(0) scale(1);
+        }
+
+        .audio-mute-track-fill {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to right,
+                rgba(244, 67, 54, 0.32) 0%,
+                rgba(244, 67, 54, 0.08) 100%);
+            transform: scaleX(var(--mute-progress, 0));
+            transform-origin: 0% 50%;
+            transition: transform 0.06s linear, opacity 0.18s var(--ease-fluid);
+            opacity: 0.85;
+            pointer-events: none;
+        }
+
+        .audio-mute-track-content {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0.4rem;
+            height: 100%;
+            padding: 0 26px 0 14px;
+            color: rgba(255, 255, 255, 0.55);
+            font-size: 0.62rem;
+            font-weight: 500;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            transition: color 0.18s var(--ease-fluid);
+        }
+
+        /* The label is anchored to the left, but the dragging button will cover
+           the right portion of the rail. Fade the label out as drag progresses
+           so the overlap reads as the button "consuming" the rail toward mute. */
+        .audio-mute-track-content > span {
+            transition: opacity 0.12s var(--ease-fluid);
+            opacity: calc(1 - var(--mute-progress, 0) * 1.4);
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .audio-mute-track.armed .audio-mute-track-content {
+            color: #ffd6d6;
+        }
+
+        .audio-mute-track.armed {
+            border-color: rgba(244, 67, 54, 0.55);
+            background: rgba(244, 67, 54, 0.18);
+        }
+
+        .audio-mute-track-icon {
+            width: 13px;
+            height: 13px;
+            flex-shrink: 0;
+        }
+
+        /* Faint left-pointing chevron animates while the rail is shown,
+           reinforcing the gesture direction. */
+        .audio-mute-track-arrow {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            width: 10px;
+            height: 10px;
+            transform: translateY(-50%);
+            color: rgba(255, 255, 255, 0.35);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.22s var(--ease-fluid) 0.05s;
+        }
+
+        .audio-mute-track.active .audio-mute-track-arrow {
+            opacity: 1;
+            animation: muteArrowNudge 1.2s ease-in-out infinite;
+        }
+
+        .audio-mute-track.armed .audio-mute-track-arrow {
+            animation: none;
+            opacity: 0;
+        }
+
+        @keyframes muteArrowNudge {
+            0%, 100% { transform: translateY(-50%) translateX(0); }
+            50% { transform: translateY(-50%) translateX(-4px); }
         }
 
         .audio-popover {
             position: fixed;
             bottom: calc(max(env(safe-area-inset-bottom, 18px), 18px) + 50px);
             left: 50%;
-            transform: translateX(-50%) translateY(8px);
             z-index: 251;
             background: rgba(15, 15, 15, 0.92);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.12);
             border-radius: 1rem;
-            padding: 0.6rem;
+            padding: 0.7rem 0.7rem 0.65rem;
             display: flex;
-            flex-wrap: wrap;
-            gap: 0.4rem;
-            justify-content: center;
+            flex-direction: column;
+            gap: 0.6rem;
             /* Always fit the viewport even on 320px-wide phones */
-            max-width: min(320px, calc(100vw - 24px));
+            max-width: min(360px, calc(100vw - 24px));
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.2s ease, transform 0.2s ease;
+            /* Closed state: tucked down, scaled in, blurred. Open springs upward
+               and resolves the blur, anchoring the emergence below the popover. */
+            transform: translateX(-50%) translateY(20px) scale(0.9);
+            transform-origin: 50% calc(100% + 10px);
+            filter: blur(6px);
+            box-shadow:
+                0 14px 40px rgba(0, 0, 0, 0.55),
+                0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+            transition:
+                opacity 0.22s var(--ease-fluid),
+                transform 0.42s var(--ease-spring),
+                filter 0.26s var(--ease-fluid),
+                box-shadow 0.3s var(--ease-fluid);
+        }
+
+        .audio-popover.open {
+            opacity: 1;
+            pointer-events: all;
+            transform: translateX(-50%) translateY(0) scale(1);
+            filter: blur(0);
+        }
+
+        /* Children are kept invisible-then-revealed via a one-shot keyframe
+           animation. Using @keyframes (not transitions) avoids fighting with
+           the chip's existing hover/active transforms. */
+        @keyframes popoverItemReveal {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .audio-popover.open .audio-volume {
+            animation: popoverItemReveal 0.34s var(--ease-spring) 0.06s backwards;
+        }
+
+        .audio-popover.open .audio-chip {
+            animation: popoverItemReveal 0.32s var(--ease-spring) backwards;
+        }
+
+        .audio-popover.open .audio-chip:nth-child(1) { animation-delay: 0.10s; }
+        .audio-popover.open .audio-chip:nth-child(2) { animation-delay: 0.13s; }
+        .audio-popover.open .audio-chip:nth-child(3) { animation-delay: 0.16s; }
+        .audio-popover.open .audio-chip:nth-child(4) { animation-delay: 0.19s; }
+        .audio-popover.open .audio-chip:nth-child(5) { animation-delay: 0.22s; }
+        .audio-popover.open .audio-chip:nth-child(6) { animation-delay: 0.25s; }
+        .audio-popover.open .audio-chip:nth-child(7) { animation-delay: 0.28s; }
+        .audio-popover.open .audio-chip:nth-child(8) { animation-delay: 0.31s; }
+
+        .audio-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            justify-content: center;
+        }
+
+        .audio-volume {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.15rem 0.3rem 0.4rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .audio-volume-icon {
+            width: 14px;
+            height: 14px;
+            color: rgba(255, 255, 255, 0.5);
+            flex-shrink: 0;
+        }
+
+        .audio-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            flex: 1;
+            height: 22px; /* tap area */
+            background: transparent;
+            cursor: pointer;
+            outline: none;
+        }
+
+        /* Track + thumb (WebKit / Blink) */
+        .audio-slider::-webkit-slider-runnable-track {
+            height: 3px;
+            background: linear-gradient(to right,
+                rgba(129, 199, 132, 0.7) 0%,
+                rgba(129, 199, 132, 0.7) var(--vol-pct, 50%),
+                rgba(255, 255, 255, 0.12) var(--vol-pct, 50%),
+                rgba(255, 255, 255, 0.12) 100%);
+            border-radius: 2px;
+        }
+
+        .audio-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            margin-top: -6.5px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+            cursor: pointer;
+            transition:
+                transform var(--dur-fast) var(--ease-fluid),
+                box-shadow var(--dur-base) var(--ease-fluid);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .audio-slider:hover::-webkit-slider-thumb {
+                transform: scale(1.1);
+                box-shadow:
+                    0 2px 6px rgba(0, 0, 0, 0.5),
+                    0 0 0 6px rgba(255, 255, 255, 0.08);
+            }
+        }
+
+        .audio-slider:active::-webkit-slider-thumb {
+            transform: scale(1.2);
+            box-shadow:
+                0 2px 6px rgba(0, 0, 0, 0.5),
+                0 0 0 8px rgba(255, 255, 255, 0.12);
+        }
+
+        .audio-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            border: none;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+            cursor: pointer;
+            transition:
+                transform var(--dur-fast) var(--ease-fluid),
+                box-shadow var(--dur-base) var(--ease-fluid);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .audio-slider:hover::-moz-range-thumb {
+                transform: scale(1.1);
+                box-shadow:
+                    0 2px 6px rgba(0, 0, 0, 0.5),
+                    0 0 0 6px rgba(255, 255, 255, 0.08);
+            }
+        }
+
+        /* Track + thumb (Firefox) */
+        .audio-slider::-moz-range-track {
+            height: 3px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 2px;
+            border: none;
+        }
+
+        .audio-slider::-moz-range-progress {
+            height: 3px;
+            background: rgba(129, 199, 132, 0.7);
+            border-radius: 2px;
         }
 
         /* Solid fallback for browsers / devices without backdrop-filter
@@ -755,86 +1342,248 @@
             .audio-btn {
                 background: rgba(20, 20, 20, 0.92);
             }
-
             .audio-popover {
                 background: rgba(12, 12, 12, 0.97);
             }
-        }
-
-        .audio-popover.open {
-            opacity: 1;
-            pointer-events: all;
-            transform: translateX(-50%) translateY(0);
+            .audio-mute-track {
+                background: rgba(20, 20, 20, 0.92);
+            }
         }
 
         .audio-chip {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: var(--surface-1);
+            border: 1px solid var(--hairline);
             border-radius: 1.5rem;
             padding: 0.45rem 0.9rem;
             color: rgba(255, 255, 255, 0.75);
             font-size: 0.8rem;
             font-weight: 500;
             cursor: pointer;
-            transition: background 0.15s, border-color 0.15s, color 0.15s;
             white-space: nowrap;
+            box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+            transition:
+                background-color var(--dur-fast) var(--ease-fluid),
+                border-color var(--dur-fast) var(--ease-fluid),
+                color var(--dur-fast) var(--ease-fluid),
+                transform var(--dur-fast) var(--ease-fluid),
+                box-shadow var(--dur-fast) var(--ease-fluid);
         }
 
-        .audio-chip:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
+        @media (hover: hover) and (pointer: fine) {
+            .audio-chip:hover {
+                background: var(--surface-3);
+                color: #fff;
+                border-color: var(--hairline-strong);
+                transform: translateY(-1px);
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+            }
         }
 
         .audio-chip.active {
             background: rgba(129, 199, 132, 0.2);
             border-color: rgba(129, 199, 132, 0.6);
             color: #81C784;
+            box-shadow: 0 0 0 1px rgba(129, 199, 132, 0.3) inset;
         }
 
-        /* ===== TABLET / IPAD (max-width: 1024px) ===== */
-        @media screen and (max-width: 1024px) and (orientation: portrait) {
+        @media (hover: hover) and (pointer: fine) {
+            .audio-chip.active:hover {
+                background: rgba(129, 199, 132, 0.28);
+                border-color: rgba(129, 199, 132, 0.8);
+                color: #81C784;
+                box-shadow:
+                    0 4px 14px rgba(102, 187, 106, 0.18),
+                    0 0 0 1px rgba(129, 199, 132, 0.45) inset;
+            }
+        }
+
+        /* ===== TABLET / IPAD ===== */
+        /* Portrait: every iPad (744-1024 wide) plus larger Android tablets.
+           Mobile-portrait (max-width: 600) takes over below this range. */
+        @media screen and (orientation: portrait) and (min-width: 601px) and (max-width: 1024px) {
             h1 {
-                font-size: clamp(3rem, 10vw, 4rem);
+                font-size: clamp(3rem, 9vw, 4rem);
+                margin-bottom: 1.2rem;
             }
 
             h2 {
-                font-size: clamp(2rem, 7vw, 3rem);
+                font-size: clamp(2rem, 6.5vw, 2.8rem);
             }
 
             .intention-text {
-                font-size: 1.3rem;
-                max-width: 90%;
+                font-size: 1.2rem;
+                max-width: 80%;
+                margin-bottom: 1.6rem;
             }
 
+            /* Pull the home title down so the screen isn't a giant void
+               between the title and the Begin button. */
+            #s1 h1 { margin-top: 14vh !important; }
+            #s2 h2 { margin-top: 6vh !important; }
+
             .picker-wrapper {
-                height: 45vh;
+                height: 42vh;
+                max-width: 460px;
+                margin: 1.4rem 0;
+            }
+
+            .picker {
+                padding-top: calc(21vh - 65px);
+                padding-bottom: calc(21vh - 65px);
+            }
+
+            .picker li {
+                height: 130px;
+                font-size: 4rem;
+            }
+
+            .picker-overlay {
+                height: 130px;
+                width: 50%;
             }
 
             .circle {
-                width: clamp(300px, 75vw, 450px);
-                height: clamp(300px, 75vw, 450px);
+                width: clamp(280px, 60vw, 420px);
+                height: clamp(280px, 60vw, 420px);
             }
+
+            .progress-ring {
+                width: clamp(310px, 66vw, 470px);
+                height: clamp(310px, 66vw, 470px);
+            }
+
+            .breathe-text {
+                font-size: 2rem;
+            }
+
+            .btn {
+                padding: 1.1rem 2.4rem;
+                font-size: 1.1rem;
+                margin-bottom: max(7vh, 80px);
+                min-height: 56px;
+            }
+
+            /* Streak panel — roomier than mobile, tighter than the desktop
+               default so the year heatmap doesn't get cropped or scroll. */
+            .streak-screen {
+                padding: 5vh 2rem calc(max(env(safe-area-inset-bottom, 18px), 18px) + 80px);
+            }
+            .streak-quote {
+                font-size: 1.15rem;
+                max-width: 72%;
+                margin: 3vh 0 2vh;
+            }
+            .streak-counter { margin: 1rem 0 0.5rem; }
+            .streak-number { font-size: clamp(4rem, 11vw, 5.5rem); }
+            .streak-stats { max-width: 540px; }
+            .stat-value { font-size: clamp(1.4rem, 4vw, 1.7rem); }
+            .chart-section { margin: 2rem auto 1.5rem; max-width: 540px; }
+            .chart-container { height: 140px; }
+            .heatmap-section { margin: 2rem auto 1rem; }
+
+            /* Quotes feed — generous breathing room for tap-to-scroll */
+            .quotes-feed-item { font-size: 1.1rem; }
         }
 
-        /* iPad Landscape / Small Laptops (max-height: 850px) */
-        @media screen and (max-width: 1024px) and (orientation: landscape) and (max-height: 850px) {
-            .btn {
-                margin-bottom: 5vh;
+        /* Landscape tablets — iPad Mini (1133×744), iPad (1180×820),
+           iPad Pro 11" (1194×834), iPad Pro 12.9" (1366×1024).
+           Also catches small 13" laptops; the touch-friendly sizing
+           reads fine there. The previous rule used max-width: 1024px
+           which never matched any iPad in landscape — that was the
+           main reason iPads dropped to the desktop layout. */
+        @media screen and (orientation: landscape) and (min-width: 768px) and (max-width: 1366px) and (max-height: 1100px) {
+            h1 {
+                font-size: clamp(2.4rem, 6vw, 3.4rem);
+                margin-bottom: 0.8rem;
+            }
+
+            h2 {
+                font-size: clamp(1.6rem, 4.2vw, 2.4rem);
             }
 
             .intention-text {
-                margin-bottom: 1.5rem;
+                font-size: 1.05rem;
+                max-width: 70%;
+                margin-bottom: 1.4rem;
             }
+
+            #s1 h1 { margin-top: 10vh !important; }
+            #s2 h2 { margin-top: 3vh !important; }
 
             .picker-wrapper {
-                height: 35vh;
-                margin: 1rem 0;
+                height: 50vh;
+                max-width: 420px;
+                margin: 0.6rem 0;
             }
 
-            .circle {
-                width: clamp(200px, 60vh, 350px);
-                height: clamp(200px, 60vh, 350px);
+            .picker {
+                padding-top: calc(25vh - 60px);
+                padding-bottom: calc(25vh - 60px);
             }
+
+            .picker li {
+                height: 120px;
+                font-size: 3.4rem;
+            }
+
+            .picker-overlay {
+                height: 120px;
+                width: 50%;
+            }
+
+            /* Circle keyed off viewport HEIGHT so it scales to short
+               iPad heights without dominating the screen. */
+            .circle {
+                width: clamp(220px, 38vh, 320px);
+                height: clamp(220px, 38vh, 320px);
+            }
+
+            .progress-ring {
+                width: clamp(250px, 44vh, 370px);
+                height: clamp(250px, 44vh, 370px);
+            }
+
+            .breathe-text {
+                font-size: 1.8rem;
+            }
+
+            .btn {
+                padding: 0.9rem 2rem;
+                font-size: 1.05rem;
+                /* Must clear the fixed audio button at the bottom-center
+                   (~56px including its safe-area inset). Set the floor at
+                   70px so iPad mini landscape never collides. */
+                margin-bottom: max(6vh, 70px);
+                min-height: 50px;
+            }
+
+            /* Streak — has to fit under 744px on iPad mini landscape.
+               Every margin and font-size below is shaved from the
+               desktop defaults so the heatmap stays in view. */
+            .streak-screen {
+                padding: 3.5vh 1.6rem calc(max(env(safe-area-inset-bottom, 14px), 14px) + 60px);
+            }
+            .streak-quote {
+                font-size: 1rem;
+                margin: 1.6vh 0 1.2vh;
+                max-width: 80%;
+            }
+            .streak-counter { margin: 0.4rem 0 0.2rem; }
+            .streak-number { font-size: clamp(3rem, 7.5vw, 4.5rem); }
+            .streak-label { font-size: 0.85rem; }
+            .streak-stats { max-width: 520px; margin: 0.8rem auto 0.3rem; gap: 0.55rem; }
+            .stat-card { padding: 0.7rem 0.5rem 0.55rem; }
+            .stat-value { font-size: clamp(1.2rem, 3.2vw, 1.5rem); }
+            .chart-section { margin: 1.2rem auto 0.6rem; max-width: 520px; }
+            .chart-title { margin-bottom: 0.5rem; }
+            .chart-container { height: 100px; }
+            .heatmap-section { margin: 0.8rem auto 0.3rem; }
+
+            /* Quotes feed — leave room for the audio button at the bottom */
+            .quotes-screen {
+                padding-bottom: calc(max(env(safe-area-inset-bottom, 14px), 14px) + 80px);
+            }
+            .quotes-feed-item { font-size: 1.05rem; padding: 1.2rem 0; }
         }
 
         /* ===== MOBILE ONLY (phones) ===== */
@@ -858,11 +1607,13 @@
                 min-height: 2.5rem;
             }
 
-            /* Bigger tap targets for buttons */
+            /* Bigger tap targets for buttons.
+               margin-bottom must clear the fixed audio-btn area at the bottom-center
+               (audio-btn occupies up to ~52px from bottom on iPhone X+). */
             .btn {
                 padding: 1.1rem 2.4rem;
                 font-size: 1.1rem;
-                margin-bottom: 8vh;
+                margin-bottom: max(8vh, 90px);
                 min-height: 52px;
             }
 
@@ -903,20 +1654,22 @@
                 padding: 12vh 0 8vh 0;
             }
 
-            /* Quotes button */
+            /* Quotes button — bump padding and min-height for 40px+ tap target */
             .quotes-btn {
                 top: max(env(safe-area-inset-top, 8px), 8px);
                 left: 12px;
-                padding: 0.45rem 0.8rem;
+                padding: 0.55rem 0.95rem;
                 font-size: 0.8rem;
+                min-height: 40px;
             }
 
             /* Streak button */
             .streak-btn {
                 top: max(env(safe-area-inset-top, 8px), 8px);
                 right: 12px;
-                padding: 0.45rem 0.8rem;
+                padding: 0.55rem 0.95rem;
                 font-size: 0.8rem;
+                min-height: 40px;
             }
 
             .streak-btn svg {
@@ -924,16 +1677,18 @@
                 height: 14px;
             }
 
-            /* Streak screen */
-            .streak-screen {
-                padding: 5vh 1rem 3vh;
+            /* Streak screen — keep generous bottom space for fixed audio-btn */
+            .streak-screen,
+            .quotes-screen {
+                padding: 5vh 1rem calc(max(env(safe-area-inset-bottom, 14px), 14px) + 75px);
             }
 
             .streak-back {
                 top: max(env(safe-area-inset-top, 8px), 8px);
                 left: 12px;
-                padding: 0.45rem 0.8rem;
+                padding: 0.55rem 0.95rem;
                 font-size: 0.8rem;
+                min-height: 40px;
             }
 
             .streak-quote {
@@ -950,6 +1705,28 @@
             .streak-label {
                 font-size: 0.85rem;
                 letter-spacing: 0.12em;
+            }
+
+            /* Stats panel: tighten on small screens but keep tap-friendly */
+            .streak-stats {
+                gap: 0.4rem;
+                margin: 1rem auto 0.4rem;
+                padding: 0 0.25rem;
+            }
+
+            .stat-card {
+                padding: 0.7rem 0.3rem 0.55rem;
+                border-radius: 0.7rem;
+            }
+
+            .stat-value {
+                font-size: clamp(1.15rem, 5.5vw, 1.5rem);
+            }
+
+            .stat-label {
+                font-size: 0.6rem;
+                letter-spacing: 0.06em;
+                margin-top: 0.2rem;
             }
 
             /* Chart adjustments */
@@ -1016,12 +1793,22 @@
                 line-height: 10px;
             }
 
-            /* Audio button - keep above home indicator */
-            .audio-btn {
+            /* Audio button - keep above home indicator and meet 40px+ tap guidance.
+               Position lives on the wrapper now, sizing on the button itself. */
+            .audio-control {
                 bottom: max(env(safe-area-inset-bottom, 14px), 14px);
-                padding: 0.55rem 0.9rem;
+            }
+            .audio-btn {
+                padding: 0.6rem 0.95rem;
                 font-size: 0.78rem;
-                min-height: 36px;
+                min-height: 42px;
+            }
+            /* Match the rail to the audio button's footprint on phones —
+               same width and height as the button so they merge cleanly
+               at full drag. */
+            .audio-mute-track {
+                width: 110px;
+                height: 42px;
             }
 
             /* Popover position must track the audio-btn bottom */
@@ -1031,12 +1818,12 @@
                 gap: 0.35rem;
             }
 
-            /* Bigger tap targets — chips are the primary interaction here */
+            /* iOS HIG / Material guidance: 44pt / 48dp tap targets */
             .audio-chip {
-                padding: 0.6rem 0.95rem;
+                padding: 0.7rem 1rem;
                 font-size: 0.82rem;
-                min-height: 38px;
-                min-width: 44px;
+                min-height: 44px;
+                min-width: 56px;
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
@@ -1056,7 +1843,7 @@
             .btn {
                 padding: 1rem 2rem;
                 font-size: 1rem;
-                margin-bottom: 6vh;
+                margin-bottom: max(6vh, 80px);
             }
 
             .picker li {
@@ -1157,7 +1944,8 @@
             .btn {
                 padding: 0.8rem 2rem;
                 font-size: 1rem;
-                margin-bottom: 8vh;
+                /* Landscape phones are short — must still clear the audio-btn at bottom-center */
+                margin-bottom: max(8vh, 60px);
                 margin-top: 0.5rem;
                 min-height: 44px;
             }
@@ -1198,9 +1986,10 @@
                 padding: 10vh 0 5vh 0;
             }
 
-            /* Streak Screen adjustments for Landscape */
-            .streak-screen {
-                padding: 10vh 1rem 2vh;
+            /* Streak / Quotes screens in landscape — clear audio-btn at bottom */
+            .streak-screen,
+            .quotes-screen {
+                padding: 10vh 1rem calc(max(env(safe-area-inset-bottom, 8px), 8px) + 55px);
             }
 
             .streak-counter {
@@ -1234,13 +2023,28 @@
                 margin-bottom: 0.5rem;
             }
 
+            /* Progress ring must be height-bounded on landscape — viewport is ~375px tall
+               and the portrait clamp would clip off-screen */
+            .progress-ring {
+                width: clamp(180px, 70vh, 290px);
+                height: clamp(180px, 70vh, 290px);
+            }
+
             /* Landscape phones: audio button needs to clear the side notch / nav bar
                and not collide with primary .btn (Begin / Home) which sits at bottom */
-            .audio-btn {
+            .audio-control {
                 bottom: max(env(safe-area-inset-bottom, 8px), 8px);
+            }
+            .audio-btn {
                 padding: 0.4rem 0.75rem;
                 font-size: 0.72rem;
                 min-height: 32px;
+            }
+            /* Match the button's smaller landscape height so the button
+               covers the rail flush at full drag. */
+            .audio-mute-track {
+                height: 32px;
+                width: 110px;
             }
 
             .audio-popover {
@@ -1252,6 +2056,86 @@
                 margin: 1rem auto 0.5rem;
             }
         }
+
+        /* Tactile press feedback — feels native on touch, harmless on desktop */
+        .stat-card:active {
+            transform: scale(0.97);
+        }
+
+        .audio-chip:active {
+            transform: scale(0.94);
+        }
+
+        /* During a breathing session, fade the audio button so it doesn't pull focus.
+           Still fully tappable; touching it brings it back to full opacity. */
+        body.in-session .audio-btn {
+            opacity: 0.35;
+            transition: opacity 0.8s ease 1.2s;
+        }
+
+        body.in-session .audio-btn:active,
+        body.in-session.popover-open .audio-btn {
+            opacity: 1;
+            transition: opacity 0.2s ease;
+        }
+
+        /* Honor reduced-motion users by stripping non-essential animations.
+           The breathing cycle is preserved — it's the core meditation feedback. */
+        @media (prefers-reduced-motion: reduce) {
+            .quotes-feed-item {
+                animation: none;
+                opacity: 1;
+            }
+
+            .chart-bar {
+                transition: none;
+            }
+
+            .heatmap-cell {
+                transition: none;
+            }
+
+            .audio-popover,
+            .progress-fill,
+            .check-svg,
+            .check-svg .check-path {
+                transition: opacity 0.1s ease;
+            }
+
+            .audio-popover {
+                transform: translateX(-50%) !important;
+                filter: none !important;
+            }
+
+            .audio-popover.open {
+                transform: translateX(-50%) !important;
+                filter: none !important;
+            }
+
+            .audio-popover.open .audio-volume,
+            .audio-popover.open .audio-chip {
+                animation: none !important;
+            }
+
+            .audio-mute-track,
+            .audio-mute-track.active {
+                transition: opacity 0.1s ease !important;
+                transform: translateY(-50%) !important;
+            }
+
+            .audio-mute-track.active .audio-mute-track-arrow {
+                animation: none !important;
+            }
+
+            .check-svg.active .check-path {
+                animation: none;
+                stroke-dashoffset: 0;
+            }
+
+            .screen {
+                transition: opacity 0.15s ease;
+            }
+        }
     </style>
 </head>
 
@@ -1260,25 +2144,57 @@
     <!-- Quotes button -->
     <button class="quotes-btn" id="quotesBtn" onclick="openQuotes()">Quotes</button>
 
-    <!-- Ambient sound button (bottom-center, visible on all screens) -->
-    <button class="audio-btn" id="audioBtn" onclick="toggleAudioPopover()" aria-label="Ambient sound">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-            stroke-linejoin="round">
-            <path d="M11 5L6 9H2v6h4l5 4V5z" />
-            <path id="audioWave1" d="M15.54 8.46a5 5 0 0 1 0 7.07" style="display:none" />
-            <path id="audioWave2" d="M19.07 4.93a10 10 0 0 1 0 14.14" style="display:none" />
-            <line id="audioMute" x1="23" y1="9" x2="17" y2="15" />
-            <line id="audioMute2" x1="17" y1="9" x2="23" y2="15" />
-        </svg>
-        <span id="audioBtnLabel">Sound</span>
-    </button>
+    <!-- Ambient sound control: wrapper hosts the button + the slide-to-mute rail.
+         Tap = open sound picker. Hold and drag the button left = mute. -->
+    <div class="audio-control" id="audioControl">
+        <div class="audio-mute-track" id="audioMuteTrack" aria-hidden="true">
+            <div class="audio-mute-track-fill"></div>
+            <div class="audio-mute-track-content">
+                <svg class="audio-mute-track-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                    <line x1="23" y1="9" x2="17" y2="15" />
+                    <line x1="17" y1="9" x2="23" y2="15" />
+                </svg>
+                <span>off</span>
+            </div>
+            <svg class="audio-mute-track-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+            </svg>
+        </div>
+        <button class="audio-btn" id="audioBtn" aria-label="Ambient sound">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                <path id="audioWave1" d="M15.54 8.46a5 5 0 0 1 0 7.07" style="display:none" />
+                <path id="audioWave2" d="M19.07 4.93a10 10 0 0 1 0 14.14" style="display:none" />
+                <line id="audioMute" x1="23" y1="9" x2="17" y2="15" />
+                <line id="audioMute2" x1="17" y1="9" x2="23" y2="15" />
+            </svg>
+            <span id="audioBtnLabel">Sound</span>
+        </button>
+    </div>
 
     <div class="audio-popover" id="audioPopover">
-        <button class="audio-chip active" data-sound="off">Off</button>
-        <button class="audio-chip" data-sound="rain">Rain</button>
-        <button class="audio-chip" data-sound="ocean">Ocean</button>
-        <button class="audio-chip" data-sound="brown">Brown noise</button>
-        <button class="audio-chip" data-sound="white">White noise</button>
+        <div class="audio-volume">
+            <svg class="audio-volume-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M11 5L6 9H2v6h4l5 4V5z" />
+            </svg>
+            <input type="range" id="audioVolume" class="audio-slider" min="0" max="100" value="50"
+                aria-label="Volume" />
+        </div>
+        <div class="audio-chips">
+            <button class="audio-chip active" data-sound="off">Off</button>
+            <button class="audio-chip" data-sound="rain">Rain</button>
+            <button class="audio-chip" data-sound="ocean">Ocean</button>
+            <button class="audio-chip" data-sound="wind">Wind</button>
+            <button class="audio-chip" data-sound="fire">Fire</button>
+            <button class="audio-chip" data-sound="birds">Birds</button>
+            <button class="audio-chip" data-sound="brown">Brown</button>
+            <button class="audio-chip" data-sound="white">White</button>
+        </div>
     </div>
 
     <!-- Streak button (visible on all screens) -->
@@ -1308,15 +2224,22 @@
     </div>
 
     <div id="s34" class="screen">
-        <div id="mainCircle" class="circle">
-            <svg id="checkSvg" class="check-svg" viewBox="0 0 52 52">
-                <path class="check-path" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"
-                    d="M14 27 l 8 8 l 16 -16" />
+        <div class="circle-stage">
+            <svg class="progress-ring" viewBox="0 0 200 200" aria-hidden="true">
+                <circle class="progress-track" cx="100" cy="100" r="96" />
+                <circle id="progressFill" class="progress-fill" cx="100" cy="100" r="96" />
             </svg>
+            <div id="mainCircle" class="circle">
+                <svg id="checkSvg" class="check-svg" viewBox="0 0 52 52">
+                    <path class="check-path" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"
+                        d="M14 27 l 8 8 l 16 -16" />
+                </svg>
+            </div>
         </div>
         <div id="breatheText" class="breathe-text">Inhale</div>
         <div id="s4UI" class="s4-ui">
             <h2>Session Complete</h2>
+            <div class="s4-summary" id="s4Summary"></div>
             <button class="btn" onclick="resetToHome()">Home</button>
         </div>
     </div>
@@ -1335,6 +2258,20 @@
         <div class="streak-counter">
             <div class="streak-number" id="streakNumber">0</div>
             <div class="streak-label">day streak</div>
+        </div>
+        <div class="streak-stats" id="streakStats">
+            <div class="stat-card">
+                <div class="stat-value" id="statLongest">0</div>
+                <div class="stat-label">Longest</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statSessions">0</div>
+                <div class="stat-label">Sessions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statTime">0m</div>
+                <div class="stat-label">Total time</div>
+            </div>
         </div>
         <div class="chart-section">
             <div class="chart-title">Last 7 Days</div>
@@ -1380,6 +2317,9 @@
         const s34El = document.getElementById('s34');
         const checkSvgEl = document.getElementById('checkSvg');
         const s4UIEl = document.getElementById('s4UI');
+        const progressFillEl = document.getElementById('progressFill');
+        const s4SummaryEl = document.getElementById('s4Summary');
+        const PROGRESS_CIRCUMFERENCE = 603.19; // 2 * PI * 96, kept in sync with the SVG radius
         const quotesScreenEl = document.getElementById('quotesScreen');
         const streakScreenEl = document.getElementById('streakScreen');
         const screenEls = document.querySelectorAll('.screen');
@@ -1389,13 +2329,44 @@
         let itemHeight = 0;
         let lastIndex = -1;
         let wakeLock = null;
+        let wakeLockRequesting = false;
+        let wakeLockMonitor = null;
 
+        /* Acquire the screen wake lock so the device doesn't auto-lock during
+           a session. The OS can revoke the lock at any time (page hidden,
+           battery saver, iOS Low Power Mode, some Android OEMs randomly), so
+           we listen for the 'release' event AND poll on an interval — neither
+           alone is sufficient in the wild. */
         async function requestWakeLock() {
             if (!('wakeLock' in navigator)) return;
+            if (!isSessionActive) return;
+            if (document.visibilityState !== 'visible') return; // request fails if hidden
+            if (wakeLock !== null || wakeLockRequesting) return; // dedupe parallel callers
+            wakeLockRequesting = true;
             try {
-                wakeLock = await navigator.wakeLock.request('screen');
+                const lock = await navigator.wakeLock.request('screen');
+                wakeLockRequesting = false;
+                // Session may have ended while we were awaiting — drop the lock.
+                if (!isSessionActive) {
+                    try { lock.release(); } catch (e) { /* ignore */ }
+                    return;
+                }
+                wakeLock = lock;
+                lock.addEventListener('release', () => {
+                    if (wakeLock === lock) wakeLock = null;
+                    // Spec releases on visibility change; we re-acquire from
+                    // handlePageVisible. But the OS can also drop the lock
+                    // while we're still visible (battery saver, etc.) — in
+                    // that case fire a fresh request immediately.
+                    if (isSessionActive && document.visibilityState === 'visible') {
+                        requestWakeLock();
+                    }
+                });
             } catch (err) {
-                console.error('Wake Lock error:', err);
+                wakeLockRequesting = false;
+                // Common reasons: tab not foregrounded, page outside a secure
+                // context, low-power mode on iOS. The meditation flow stays
+                // silent rather than surfacing these to the user.
             }
         }
 
@@ -1407,10 +2378,58 @@
             }
         }
 
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && isSessionActive) {
-                requestWakeLock();
+        function startWakeLockMonitor() {
+            stopWakeLockMonitor();
+            // Defense in depth. Some Android OEMs drop the lock without
+            // firing 'release', and visibilitychange doesn't cover every
+            // path. A slow poll catches the gap so the screen can't slip
+            // off mid-session.
+            wakeLockMonitor = setInterval(() => {
+                if (!isSessionActive) { stopWakeLockMonitor(); return; }
+                if (document.visibilityState !== 'visible') return;
+                // wakeLock.released is true if the OS released it without
+                // firing the event we're listening for.
+                if (wakeLock === null || (wakeLock && wakeLock.released)) {
+                    wakeLock = null;
+                    requestWakeLock();
+                }
+            }, 15000);
+        }
+
+        function stopWakeLockMonitor() {
+            if (wakeLockMonitor !== null) {
+                clearInterval(wakeLockMonitor);
+                wakeLockMonitor = null;
             }
+        }
+
+        /* Single page-lifecycle handler covers wake-lock, audio resume, and bfcache restore.
+           Replaces two separate visibilitychange listeners and adds pageshow / pagehide.
+              - visibilitychange visible: re-request wake-lock and resume suspended audio
+              - pageshow with persisted=true: restored from iOS bfcache; same recovery
+              - pagehide: best-effort cleanup so the audio graph doesn't outlive the page */
+        function handlePageVisible() {
+            if (isSessionActive) requestWakeLock();
+            if (audioCtx && audioCtx.state === 'suspended' && currentSound !== 'off') {
+                // resume returns a Promise — surface failures silently rather than
+                // letting an unhandled rejection bubble up to the user
+                Promise.resolve(audioCtx.resume()).catch(() => { });
+            }
+        }
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') handlePageVisible();
+        });
+        // iOS Safari restores from bfcache without firing visibilitychange — pageshow with persisted=true
+        // is the only reliable hook to re-enable our audio context on back/forward navigation.
+        window.addEventListener('pageshow', (e) => {
+            if (e.persisted) handlePageVisible();
+        });
+        // Best-effort teardown so the AudioContext doesn't leak on tab close / nav-away.
+        // Use pagehide (works in iOS) instead of unload (deprecated and unreliable on iOS).
+        window.addEventListener('pagehide', () => {
+            try { if (activeHandle) fadeAndStop(activeHandle); } catch (e) { }
+            // Don't close audioCtx — Safari occasionally fires pagehide for bfcache and
+            // closing here would prevent restore. The browser collects it on real unload.
         });
 
         /* --- 16,000 Intentions (lazy, indexed) --- */
@@ -1485,6 +2504,51 @@
             return motivData.v4[0] + ' your ' + motivData.q4[(i / 50) | 0] + '. ' + motivData.r4[i % 50] + '.';
         }
 
+        /* --- Storage helpers ---
+           Centralized try/catch so private-browsing, iframe storage-disabled, and
+           QuotaExceededError on long-running users don't crash the meditation flow.
+           Each helper degrades to a sensible default rather than throwing. */
+        function storageGet(key, fallback) {
+            try {
+                const v = localStorage.getItem(key);
+                return v === null ? fallback : v;
+            } catch (e) { return fallback; }
+        }
+        function storageSet(key, value) {
+            try {
+                localStorage.setItem(key, value);
+                return true;
+            } catch (e) {
+                // QuotaExceeded (Safari private mode caps at ~0 bytes; long-running users
+                // can also exceed quota with thousands of sessions). Trim the largest
+                // user-data array (zen_sessions) and retry once.
+                if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
+                    try {
+                        const raw = localStorage.getItem('zen_sessions');
+                        if (raw) {
+                            const log = JSON.parse(raw);
+                            // Keep most recent half — older entries fall off the heatmap anyway
+                            if (Array.isArray(log) && log.length > 100) {
+                                const trimmed = log.slice(-((log.length / 2) | 0));
+                                localStorage.setItem('zen_sessions', JSON.stringify(trimmed));
+                                localStorage.setItem(key, value);
+                                return true;
+                            }
+                        }
+                    } catch (_) { /* still failed — give up silently */ }
+                }
+                return false;
+            }
+        }
+        function storageGetJSON(key, fallback) {
+            const raw = storageGet(key, null);
+            if (raw === null) return fallback;
+            try { return JSON.parse(raw); } catch (e) { return fallback; }
+        }
+        function storageSetJSON(key, value) {
+            try { return storageSet(key, JSON.stringify(value)); } catch (e) { return false; }
+        }
+
         /* --- Streak Tracking (localStorage, local timezone, DST-safe) --- */
         function dayKey(d) {
             const y = d.getFullYear();
@@ -1493,12 +2557,13 @@
             return y + '-' + m + '-' + day;
         }
         function getSessionLog() {
-            try { return JSON.parse(localStorage.getItem('zen_sessions') || '[]'); } catch (e) { return []; }
+            const log = storageGetJSON('zen_sessions', []);
+            return Array.isArray(log) ? log : [];
         }
         function logSession(durationMin) {
             const log = getSessionLog();
             log.push({ date: dayKey(new Date()), mins: durationMin });
-            try { localStorage.setItem('zen_sessions', JSON.stringify(log)); } catch (e) { }
+            storageSetJSON('zen_sessions', log);
         }
         function calcStreak(log) {
             if (!log) log = getSessionLog();
@@ -1587,6 +2652,42 @@
 
         function updateStreakBtn() {
             streakBtnLabelEl.textContent = calcStreak();
+        }
+
+        function calcStats(log) {
+            if (!log) log = getSessionLog();
+            const stats = { sessions: log.length, totalMins: 0, longest: 0 };
+            if (!log.length) return stats;
+
+            const minsByDate = Object.create(null);
+            for (let i = 0; i < log.length; i++) {
+                const s = log[i];
+                stats.totalMins += s.mins;
+                minsByDate[s.date] = (minsByDate[s.date] || 0) + s.mins;
+            }
+            const days = Object.keys(minsByDate).sort();
+            let longest = 1, current = 1;
+            for (let i = 1; i < days.length; i++) {
+                const cur = new Date(days[i] + 'T00:00:00');
+                const prev = new Date(days[i - 1] + 'T00:00:00');
+                const diff = Math.round((cur - prev) / 86400000);
+                if (diff === 1) {
+                    current++;
+                    if (current > longest) longest = current;
+                } else {
+                    current = 1;
+                }
+            }
+            stats.longest = longest;
+            return stats;
+        }
+
+        function formatTotalTime(mins) {
+            if (mins < 60) return mins + 'm';
+            const h = (mins / 60) | 0;
+            const m = mins % 60;
+            if (h < 100) return h + 'h ' + m + 'm';
+            return h + 'h';
         }
 
         let previousScreen = 's1';
@@ -1894,6 +2995,9 @@
         const heatmapGridEl = document.getElementById('heatmapGrid');
         const heatmapMonthsEl = document.getElementById('heatmapMonths');
         const heatmapScrollEl = document.querySelector('.heatmap-scroll');
+        const statLongestEl = document.getElementById('statLongest');
+        const statSessionsEl = document.getElementById('statSessions');
+        const statTimeEl = document.getElementById('statTime');
 
         function heatmapLevel(mins) {
             if (mins <= 0) return 0;
@@ -1940,20 +3044,25 @@
 
         function renderStreakScreen() {
             // Quote (non-repeating)
-            let seenQ = [];
-            try { seenQ = JSON.parse(localStorage.getItem('zen_seen_q') || '[]'); } catch (e) { }
-            if (seenQ.length >= motivQuotesLength) seenQ = [];
+            let seenQ = storageGetJSON('zen_seen_q', []);
+            if (!Array.isArray(seenQ) || seenQ.length >= motivQuotesLength) seenQ = [];
             const seenSet = new Set(seenQ);
             let qIdx;
             do { qIdx = (Math.random() * motivQuotesLength) | 0; } while (seenSet.has(qIdx));
             streakQuoteEl.textContent = '"' + getMotivQuote(qIdx) + '"';
             seenQ.push(qIdx);
-            try { localStorage.setItem('zen_seen_q', JSON.stringify(seenQ)); } catch (e) { }
+            storageSetJSON('zen_seen_q', seenQ);
             setTimeout(() => streakQuoteEl.classList.add('show'), 100);
 
-            // Single shared session log read for streak number + chart
+            // Single shared session log read for streak number + chart + stats
             const log = getSessionLog();
             streakNumberEl.textContent = calcStreak(log);
+
+            // Stats panel
+            const stats = calcStats(log);
+            statLongestEl.textContent = stats.longest;
+            statSessionsEl.textContent = stats.sessions;
+            statTimeEl.textContent = formatTotalTime(stats.totalMins);
 
             // Chart
             streakChartEl.textContent = '';
@@ -2003,25 +3112,47 @@
         const audioMuteEl = document.getElementById('audioMute');
         const audioMute2El = document.getElementById('audioMute2');
 
-        const SOUND_LABELS = { off: 'Sound', rain: 'Rain', ocean: 'Ocean', brown: 'Brown', white: 'White' };
+        const SOUND_LABELS = {
+            off: 'Sound', rain: 'Rain', ocean: 'Ocean', brown: 'Brown',
+            white: 'White', wind: 'Wind', fire: 'Fire', birds: 'Birds'
+        };
 
         let audioCtx = null;
         let masterGain = null;
-        let activeNodes = null;
+        let activeHandle = null;
         let currentSound = 'off';
         let popoverOpen = false;
+        let userVolume = 0.5; // 0..1, scaled to masterGain
 
         function ensureCtx() {
             if (!audioCtx) {
                 const Ctx = window.AudioContext || window.webkitAudioContext;
                 if (!Ctx) return null;
-                audioCtx = new Ctx();
-                masterGain = audioCtx.createGain();
-                masterGain.gain.value = 0.18;
-                masterGain.connect(audioCtx.destination);
+                try {
+                    audioCtx = new Ctx();
+                    masterGain = audioCtx.createGain();
+                    masterGain.gain.value = userVolume * 0.35;
+                    masterGain.connect(audioCtx.destination);
+                } catch (e) {
+                    // Audio hardware unavailable / blocked — degrade gracefully
+                    audioCtx = null;
+                    return null;
+                }
             }
-            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (audioCtx.state === 'suspended') {
+                // Always handle the Promise — Safari rejects it if not in a user gesture.
+                Promise.resolve(audioCtx.resume()).catch(() => { });
+            }
             return audioCtx;
+        }
+
+        function applyVolume() {
+            if (masterGain) {
+                const target = userVolume * 0.35;
+                const t = audioCtx.currentTime;
+                masterGain.gain.cancelScheduledValues(t);
+                masterGain.gain.setTargetAtTime(target, t, 0.05);
+            }
         }
 
         function buildNoiseBuffer(ctx, kind) {
@@ -2032,7 +3163,7 @@
                 if (kind === 'white') {
                     for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
                 } else {
-                    // brown noise (used for brown + ocean + rain base)
+                    // brown noise (used for brown + ocean + rain + wind + fire base)
                     let last = 0;
                     for (let i = 0; i < length; i++) {
                         const w = Math.random() * 2 - 1;
@@ -2044,28 +3175,32 @@
             return buffer;
         }
 
-        function fadeAndStop(nodes) {
-            if (!nodes) return;
+        function fadeAndStop(handle) {
+            if (!handle) return;
             const ctx = audioCtx;
             const t = ctx.currentTime;
             try {
-                nodes.gain.gain.cancelScheduledValues(t);
-                nodes.gain.gain.setValueAtTime(nodes.gain.gain.value, t);
-                nodes.gain.gain.linearRampToValueAtTime(0, t + 0.4);
+                handle.gain.gain.cancelScheduledValues(t);
+                handle.gain.gain.setValueAtTime(handle.gain.gain.value, t);
+                handle.gain.gain.linearRampToValueAtTime(0, t + 0.4);
             } catch (e) { }
             setTimeout(() => {
-                if (nodes.src) { try { nodes.src.stop(); } catch (e) { } }
-                if (nodes.lfo) { try { nodes.lfo.stop(); } catch (e) { } }
+                try { handle.cleanup && handle.cleanup(); } catch (e) { }
             }, 450);
+        }
+
+        function makeFadeInGain(ctx) {
+            const gain = ctx.createGain();
+            gain.gain.value = 0;
+            gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.6);
+            gain.connect(masterGain);
+            return gain;
         }
 
         function startAmbient(kind) {
             const ctx = ensureCtx();
             if (!ctx) return null;
-            const gain = ctx.createGain();
-            gain.gain.value = 0;
-            gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.6);
-            gain.connect(masterGain);
+            const gain = makeFadeInGain(ctx);
 
             if (kind === 'white' || kind === 'brown') {
                 const src = ctx.createBufferSource();
@@ -2073,7 +3208,7 @@
                 src.loop = true;
                 src.connect(gain);
                 src.start();
-                return { src, gain };
+                return { gain, cleanup: () => { try { src.stop(); } catch (e) { } } };
             }
 
             if (kind === 'rain') {
@@ -2088,7 +3223,7 @@
                 lp.frequency.value = 5500;
                 src.connect(hp).connect(lp).connect(gain);
                 src.start();
-                return { src, gain };
+                return { gain, cleanup: () => { try { src.stop(); } catch (e) { } } };
             }
 
             if (kind === 'ocean') {
@@ -2098,7 +3233,6 @@
                 const lp = ctx.createBiquadFilter();
                 lp.type = 'lowpass';
                 lp.frequency.value = 550;
-                // slow swell: LFO modulates a gain stage between waves
                 const swell = ctx.createGain();
                 swell.gain.value = 0.55;
                 const lfo = ctx.createOscillator();
@@ -2109,7 +3243,149 @@
                 src.connect(lp).connect(swell).connect(gain);
                 src.start();
                 lfo.start();
-                return { src, gain, lfo };
+                return {
+                    gain, cleanup: () => {
+                        try { src.stop(); } catch (e) { }
+                        try { lfo.stop(); } catch (e) { }
+                    }
+                };
+            }
+
+            if (kind === 'wind') {
+                // Filtered brown noise + LFO-modulated cutoff for gusts.
+                const src = ctx.createBufferSource();
+                src.buffer = buildNoiseBuffer(ctx, 'brown');
+                src.loop = true;
+
+                const lp = ctx.createBiquadFilter();
+                lp.type = 'lowpass';
+                lp.frequency.value = 700;
+                lp.Q.value = 0.5;
+
+                // Cutoff LFO — slow gusts pushing brightness up and back
+                const cutoffLfo = ctx.createOscillator();
+                cutoffLfo.frequency.value = 0.07;
+                const cutoffDepth = ctx.createGain();
+                cutoffDepth.gain.value = 450;
+                cutoffLfo.connect(cutoffDepth).connect(lp.frequency);
+
+                // Amplitude swell so the gust feels like it has weight
+                const swell = ctx.createGain();
+                swell.gain.value = 0.55;
+                const ampLfo = ctx.createOscillator();
+                ampLfo.frequency.value = 0.05;
+                const ampDepth = ctx.createGain();
+                ampDepth.gain.value = 0.35;
+                ampLfo.connect(ampDepth).connect(swell.gain);
+
+                src.connect(lp).connect(swell).connect(gain);
+                src.start();
+                cutoffLfo.start();
+                ampLfo.start();
+                return {
+                    gain, cleanup: () => {
+                        try { src.stop(); } catch (e) { }
+                        try { cutoffLfo.stop(); } catch (e) { }
+                        try { ampLfo.stop(); } catch (e) { }
+                    }
+                };
+            }
+
+            if (kind === 'fire') {
+                // Warm low-passed brown noise bed + random short crackle pops.
+                const bedSrc = ctx.createBufferSource();
+                bedSrc.buffer = buildNoiseBuffer(ctx, 'brown');
+                bedSrc.loop = true;
+                const bedLp = ctx.createBiquadFilter();
+                bedLp.type = 'lowpass';
+                bedLp.frequency.value = 700;
+                const bedGain = ctx.createGain();
+                bedGain.gain.value = 0.7;
+                bedSrc.connect(bedLp).connect(bedGain).connect(gain);
+                bedSrc.start();
+
+                // Pre-build a short noise buffer reused for crackle bursts
+                const crackleBuf = buildNoiseBuffer(ctx, 'white');
+                const stopFlag = { stopped: false };
+                let timer = null;
+                function popCrackle() {
+                    if (stopFlag.stopped) return;
+                    const now = ctx.currentTime;
+                    const burst = ctx.createBufferSource();
+                    burst.buffer = crackleBuf;
+                    burst.playbackRate.value = 0.8 + Math.random() * 0.6;
+                    const bp = ctx.createBiquadFilter();
+                    bp.type = 'bandpass';
+                    bp.frequency.value = 1100 + Math.random() * 2400;
+                    bp.Q.value = 1.4;
+                    const env = ctx.createGain();
+                    const dur = 0.02 + Math.random() * 0.07;
+                    env.gain.setValueAtTime(0, now);
+                    env.gain.linearRampToValueAtTime(0.35 + Math.random() * 0.4, now + 0.004);
+                    env.gain.exponentialRampToValueAtTime(0.001, now + dur);
+                    burst.connect(bp).connect(env).connect(gain);
+                    burst.start(now);
+                    burst.stop(now + dur + 0.05);
+                    timer = setTimeout(popCrackle, 80 + Math.random() * 380);
+                }
+                popCrackle();
+
+                return {
+                    gain, cleanup: () => {
+                        stopFlag.stopped = true;
+                        if (timer) clearTimeout(timer);
+                        try { bedSrc.stop(); } catch (e) { }
+                    }
+                };
+            }
+
+            if (kind === 'birds') {
+                // Forest-bed (very quiet wind underneath) + random sine-wave chirps.
+                const bedSrc = ctx.createBufferSource();
+                bedSrc.buffer = buildNoiseBuffer(ctx, 'brown');
+                bedSrc.loop = true;
+                const bedLp = ctx.createBiquadFilter();
+                bedLp.type = 'lowpass';
+                bedLp.frequency.value = 600;
+                const bedGain = ctx.createGain();
+                bedGain.gain.value = 0.18;
+                bedSrc.connect(bedLp).connect(bedGain).connect(gain);
+                bedSrc.start();
+
+                const stopFlag = { stopped: false };
+                let timer = null;
+                function chirp() {
+                    if (stopFlag.stopped) return;
+                    // 1-3 quick notes per "call"
+                    const noteCount = 1 + (Math.random() * 3) | 0;
+                    const baseFreq = 1900 + Math.random() * 2600; // 1.9-4.5kHz
+                    for (let i = 0; i < noteCount; i++) {
+                        const start = audioCtx.currentTime + i * (0.06 + Math.random() * 0.08);
+                        const dur = 0.07 + Math.random() * 0.16;
+                        const osc = ctx.createOscillator();
+                        osc.type = 'sine';
+                        const f = baseFreq * (0.85 + Math.random() * 0.3);
+                        osc.frequency.setValueAtTime(f, start);
+                        osc.frequency.exponentialRampToValueAtTime(f * (0.7 + Math.random() * 0.6), start + dur);
+                        const env = ctx.createGain();
+                        env.gain.setValueAtTime(0, start);
+                        env.gain.linearRampToValueAtTime(0.22 + Math.random() * 0.12, start + 0.012);
+                        env.gain.exponentialRampToValueAtTime(0.001, start + dur);
+                        osc.connect(env).connect(gain);
+                        osc.start(start);
+                        osc.stop(start + dur + 0.05);
+                    }
+                    timer = setTimeout(chirp, 350 + Math.random() * 2400);
+                }
+                chirp();
+
+                return {
+                    gain, cleanup: () => {
+                        stopFlag.stopped = true;
+                        if (timer) clearTimeout(timer);
+                        try { bedSrc.stop(); } catch (e) { }
+                    }
+                };
             }
 
             return null;
@@ -2117,9 +3393,14 @@
 
         function setSound(kind) {
             if (kind === currentSound) return;
-            // tear down
-            if (activeNodes) fadeAndStop(activeNodes);
-            activeNodes = null;
+            // Validate against the known sound table so a stale localStorage value or
+            // injected DOM attribute can't drive us into an undefined startAmbient branch.
+            if (!Object.prototype.hasOwnProperty.call(SOUND_LABELS, kind)) return;
+
+            // Tear down. fadeAndStop holds its own reference and self-cleans after 450ms,
+            // so rapid switching can't leak — each old handle continues to fade independently.
+            if (activeHandle) fadeAndStop(activeHandle);
+            activeHandle = null;
             currentSound = kind;
 
             // Update chips
@@ -2137,24 +3418,218 @@
             audioMute2El.style.display = isOn ? 'none' : '';
 
             // Persist
-            try { localStorage.setItem('zen_sound', kind); } catch (e) { }
+            storageSet('zen_sound', kind);
 
             if (kind === 'off') return;
 
-            activeNodes = startAmbient(kind);
+            // Audio hardware failures (rare, but real on locked Chromebooks / managed Windows)
+            // shouldn't take down the rest of the meditation flow.
+            try {
+                activeHandle = startAmbient(kind);
+                if (!activeHandle) {
+                    // startAmbient returned null — context unavailable. Revert visual state.
+                    currentSound = 'off';
+                    audioBtnEl.classList.remove('on');
+                    audioBtnLabelEl.textContent = 'Sound';
+                    audioWave1El.style.display = 'none';
+                    audioWave2El.style.display = 'none';
+                    audioMuteEl.style.display = '';
+                    audioMute2El.style.display = '';
+                    chips.forEach(c => c.classList.toggle('active', c.dataset.sound === 'off'));
+                }
+            } catch (e) {
+                activeHandle = null;
+                currentSound = 'off';
+            }
         }
 
         function toggleAudioPopover() {
             popoverOpen = !popoverOpen;
             audioPopoverEl.classList.toggle('open', popoverOpen);
+            document.body.classList.toggle('popover-open', popoverOpen);
         }
 
-        // Close popover on outside tap
-        document.addEventListener('click', (e) => {
+        function closeAudioPopover() {
             if (!popoverOpen) return;
-            if (audioPopoverEl.contains(e.target) || audioBtnEl.contains(e.target)) return;
             popoverOpen = false;
             audioPopoverEl.classList.remove('open');
+            document.body.classList.remove('popover-open');
+        }
+
+        /* --- Hold-and-drag-left to mute -----------------------------------
+           Tap the button = open the picker. Press-and-hold the button = the
+           rail eases in to the left as a hint. Drag the button left past the
+           threshold and release = sound switches off. Works for mouse,
+           trackpad, pen, and touch via the unified Pointer Events API. */
+        const audioControlEl = document.getElementById('audioControl');
+        const audioMuteTrackEl = document.getElementById('audioMuteTrack');
+
+        const HOLD_HINT_DELAY_MS = 220;   // press-and-wait before rail eases in
+        const DRAG_TRIGGER_PX = 5;        // leftward delta that locks drag mode
+        const MUTE_THRESHOLD = 0.7;       // commit if released past this fraction
+        const MUTE_DRAG_FALLBACK = 110;   // used only if measurement fails
+
+        let holdTimer = null;
+        let holdState = null;
+        let suppressNextClick = false;
+
+        function clearHoldTimer() {
+            if (holdTimer !== null) {
+                clearTimeout(holdTimer);
+                holdTimer = null;
+            }
+        }
+
+        function tryHaptic(pattern) {
+            // Best-effort: only Android/Chrome implement vibrate; iOS ignores it.
+            if (navigator.vibrate) {
+                try { navigator.vibrate(pattern); } catch (e) { /* ignore */ }
+            }
+        }
+
+        /* Distance the button must slide left so its centre lands exactly on
+           the rail's centre — at that point the two pills overlap completely
+           and the rail is fully covered. Measured live so it stays correct
+           across phone / tablet / desktop breakpoints. */
+        function measureMuteDragDistance() {
+            const railRect = audioMuteTrackEl.getBoundingClientRect();
+            const btnRect = audioBtnEl.getBoundingClientRect();
+            // If the rail is hidden / unmeasurable, fall back to a sensible
+            // constant so the gesture still works.
+            if (!railRect.width || !btnRect.width) return MUTE_DRAG_FALLBACK;
+            const railCenter = railRect.left + railRect.width / 2;
+            const btnCenter = btnRect.left + btnRect.width / 2;
+            return Math.max(60, btnCenter - railCenter);
+        }
+
+        function updateMuteDrag(dx) {
+            const dist = holdState.dragDistance;
+            const clamped = Math.max(-dist, Math.min(0, dx));
+            const progress = -clamped / dist;
+            audioBtnEl.style.setProperty('--drag-x', clamped + 'px');
+            audioMuteTrackEl.style.setProperty('--mute-progress', progress.toFixed(3));
+
+            const armed = progress >= MUTE_THRESHOLD;
+            if (armed !== holdState.armed) {
+                holdState.armed = armed;
+                audioMuteTrackEl.classList.toggle('armed', armed);
+                audioBtnEl.classList.toggle('armed', armed);
+                if (armed) tryHaptic(14);
+            }
+        }
+
+        function resetMuteUI() {
+            audioControlEl.classList.remove('dragging');
+            audioMuteTrackEl.classList.remove('active', 'armed');
+            audioBtnEl.classList.remove('armed');
+            audioBtnEl.style.setProperty('--drag-x', '0px');
+            audioMuteTrackEl.style.setProperty('--mute-progress', '0');
+        }
+
+        audioBtnEl.addEventListener('pointerdown', (e) => {
+            // Mouse: only respond to primary button. Touch/pen pass through.
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            // The gesture is meaningless when nothing is playing — fall through
+            // to the default click→toggle behavior so users can open the picker.
+            if (currentSound === 'off') return;
+
+            // Clear any stale flag from a previous gesture that didn't reach click.
+            suppressNextClick = false;
+
+            holdState = {
+                pointerId: e.pointerId,
+                startX: e.clientX,
+                startY: e.clientY,
+                hintShown: false,
+                dragging: false,
+                armed: false,
+                // Snapshot the distance once at gesture start; it can't change
+                // mid-drag and a single measurement avoids per-frame layout work.
+                dragDistance: measureMuteDragDistance(),
+            };
+
+            // Capture so pointermove/up keep firing if the finger leaves the button.
+            try { audioBtnEl.setPointerCapture(e.pointerId); } catch (err) { /* older browsers */ }
+
+            holdTimer = setTimeout(() => {
+                holdTimer = null;
+                if (!holdState || holdState.dragging) return;
+                holdState.hintShown = true;
+                audioMuteTrackEl.classList.add('active');
+                tryHaptic(8);
+            }, HOLD_HINT_DELAY_MS);
+        });
+
+        audioBtnEl.addEventListener('pointermove', (e) => {
+            if (!holdState || holdState.pointerId !== e.pointerId) return;
+            const dx = e.clientX - holdState.startX;
+            const dy = e.clientY - holdState.startY;
+
+            if (!holdState.dragging) {
+                // Vertical motion clearly winning — abandon so vertical
+                // scroll / other pointer interpreters can take over cleanly.
+                if (Math.abs(dy) > 18 && Math.abs(dy) > Math.abs(dx) * 1.4) {
+                    clearHoldTimer();
+                    try { audioBtnEl.releasePointerCapture(e.pointerId); } catch (err) {}
+                    resetMuteUI();
+                    holdState = null;
+                    return;
+                }
+                if (dx < -DRAG_TRIGGER_PX) {
+                    holdState.dragging = true;
+                    clearHoldTimer();
+                    audioMuteTrackEl.classList.add('active');
+                    audioControlEl.classList.add('dragging');
+                    suppressNextClick = true;
+                    if (!holdState.hintShown) tryHaptic(8);
+                }
+            }
+
+            if (holdState.dragging) updateMuteDrag(dx);
+        });
+
+        function endMuteHold(e) {
+            if (!holdState || holdState.pointerId !== e.pointerId) return;
+            const wasDragging = holdState.dragging;
+            const wasArmed = holdState.armed;
+            const wasHinted = holdState.hintShown;
+
+            try { audioBtnEl.releasePointerCapture(e.pointerId); } catch (err) {}
+            clearHoldTimer();
+            resetMuteUI();
+            holdState = null;
+
+            // Long press shown the rail but no drag → swallow the click so we
+            // don't surprise the user by also opening the picker.
+            if (wasHinted && !wasDragging) suppressNextClick = true;
+
+            if (wasDragging && wasArmed) {
+                setSound('off');
+                closeAudioPopover();
+            }
+        }
+
+        audioBtnEl.addEventListener('pointerup', endMuteHold);
+        audioBtnEl.addEventListener('pointercancel', endMuteHold);
+
+        // Tap = open the picker. Replaces the inline onclick so we can swallow
+        // clicks that came from a hold/drag gesture.
+        audioBtnEl.addEventListener('click', (e) => {
+            if (suppressNextClick) {
+                suppressNextClick = false;
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                return;
+            }
+            toggleAudioPopover();
+        });
+
+        // Close popover on outside tap. Use the wrapper so the rail (a sibling
+        // of the button inside the wrapper) is treated as part of the control.
+        document.addEventListener('click', (e) => {
+            if (!popoverOpen) return;
+            if (audioPopoverEl.contains(e.target) || audioControlEl.contains(e.target)) return;
+            closeAudioPopover();
         });
 
         // Chip clicks
@@ -2163,24 +3638,48 @@
             if (!chip) return;
             setSound(chip.dataset.sound);
             // Close popover after selection so the meditative UI returns to its quiet state
-            setTimeout(() => {
-                popoverOpen = false;
-                audioPopoverEl.classList.remove('open');
-            }, 200);
+            setTimeout(closeAudioPopover, 200);
         });
 
-        // Resume suspended audio context when returning from background (iOS Safari, Chrome Android)
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState !== 'visible') return;
-            if (audioCtx && audioCtx.state === 'suspended' && currentSound !== 'off') {
-                audioCtx.resume();
+        // (visibility / bfcache resume handled by the consolidated handlePageVisible above)
+
+        // Volume slider
+        const audioVolumeEl = document.getElementById('audioVolume');
+        function setVolumePct(pct) {
+            const clamped = Math.max(0, Math.min(100, pct | 0));
+            userVolume = clamped / 100;
+            audioVolumeEl.value = clamped;
+            audioVolumeEl.style.setProperty('--vol-pct', clamped + '%');
+            applyVolume();
+            storageSet('zen_volume', String(clamped));
+        }
+        {
+            const savedVol = storageGet('zen_volume', null);
+            if (savedVol !== null) {
+                const v = parseInt(savedVol, 10);
+                if (!isNaN(v)) {
+                    userVolume = Math.max(0, Math.min(100, v)) / 100;
+                    audioVolumeEl.value = v;
+                    audioVolumeEl.style.setProperty('--vol-pct', v + '%');
+                } else {
+                    audioVolumeEl.style.setProperty('--vol-pct', '50%');
+                }
+            } else {
+                audioVolumeEl.style.setProperty('--vol-pct', '50%');
             }
+        }
+
+        audioVolumeEl.addEventListener('input', (e) => {
+            // Ensure ctx exists so applyVolume has a target — mobile users dragging the
+            // slider before picking a sound expect their preference to stick.
+            if (currentSound !== 'off') ensureCtx();
+            setVolumePct(parseInt(e.target.value, 10));
         });
 
         // Restore sound preference (but only resume audio after a user gesture)
         let pendingRestoreSound = null;
-        try {
-            const saved = localStorage.getItem('zen_sound');
+        {
+            const saved = storageGet('zen_sound', null);
             if (saved && saved !== 'off' && SOUND_LABELS[saved]) {
                 pendingRestoreSound = saved;
                 // Reflect chip selection visually without starting audio yet
@@ -2195,7 +3694,7 @@
                 audioMuteEl.style.display = 'none';
                 audioMute2El.style.display = 'none';
             }
-        } catch (e) { }
+        }
 
         function resumePendingSoundOnGesture() {
             if (!pendingRestoreSound) return;
@@ -2209,15 +3708,14 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             const intentionEl = document.getElementById('dailyIntention');
-            let seen = [];
-            try { seen = JSON.parse(localStorage.getItem('zen_seen') || '[]'); } catch (e) { }
-            if (seen.length >= intentionsLength) seen = [];
+            let seen = storageGetJSON('zen_seen', []);
+            if (!Array.isArray(seen) || seen.length >= intentionsLength) seen = [];
             const seenSet = new Set(seen);
             let randomIdx;
             do { randomIdx = (Math.random() * intentionsLength) | 0; } while (seenSet.has(randomIdx));
             intentionEl.textContent = '"' + getIntention(randomIdx) + '"';
             seen.push(randomIdx);
-            try { localStorage.setItem('zen_seen', JSON.stringify(seen)); } catch (e) { }
+            storageSetJSON('zen_seen', seen);
             setTimeout(() => intentionEl.style.opacity = '1', 150);
 
             // Build picker items in a single fragment to avoid 31 reflows
@@ -2332,18 +3830,29 @@
         async function startSession() {
             nav('s34');
             isSessionActive = true;
+            document.body.classList.add('in-session');
             streakBtnEl.style.display = 'none';
             quotesBtnEl.style.display = 'none';
             requestWakeLock();
+            startWakeLockMonitor();
 
             mainCircle.style.transform = 'scale(0.4)';
             breatheText.style.opacity = '1';
+
+            // Reset progress ring (no transition on the reset jump)
+            progressFillEl.style.transition = 'none';
+            progressFillEl.style.opacity = '1';
+            progressFillEl.style.strokeDashoffset = PROGRESS_CIRCUMFERENCE;
+            // Force reflow then re-enable the slow fill transition
+            void progressFillEl.getBoundingClientRect();
+            progressFillEl.style.transition = 'stroke-dashoffset 0.6s linear, opacity 0.8s ease';
 
             const start = performance.now();
             mainCircle.classList.add('animate-breathe');
 
             let textFaded = false;
             let lastBreatheText = '';
+            let lastProgressUpdate = 0;
             function loop(now) {
                 if (!isSessionActive || !s34El.classList.contains('active')) return;
 
@@ -2356,7 +3865,6 @@
                     else if (p < 6000) target = 'Hold';
                     else if (p < 10500) target = 'Exhale';
                     else target = 'Hold';
-                    // Only touch the DOM when the label actually changes
                     if (target !== lastBreatheText) {
                         breatheText.textContent = target;
                         lastBreatheText = target;
@@ -2364,6 +3872,14 @@
                 } else if (!textFaded) {
                     breatheText.style.opacity = '0';
                     textFaded = true;
+                }
+
+                // Progress ring — update at most twice per second to keep the linear
+                // CSS transition smoothing the visual; saves needless DOM writes.
+                if (now - lastProgressUpdate > 500) {
+                    const progress = Math.min(1, elapsed / selectedDurationMs);
+                    progressFillEl.style.strokeDashoffset = PROGRESS_CIRCUMFERENCE * (1 - progress);
+                    lastProgressUpdate = now;
                 }
 
                 if (elapsed >= selectedDurationMs) endSession();
@@ -2374,17 +3890,27 @@
 
         function endSession() {
             isSessionActive = false;
+            document.body.classList.remove('in-session');
+            stopWakeLockMonitor();
             releaseWakeLock();
 
             // Log the completed session
-            logSession(Math.round(selectedDurationMs / 60000));
+            const sessionMins = Math.max(1, Math.round(selectedDurationMs / 60000));
+            logSession(sessionMins);
             updateStreakBtn();
+
+            // Subtle haptic celebration on supported devices (no sound)
+            if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
 
             // Trap bounding container scale
             const transform = window.getComputedStyle(mainCircle).transform;
             mainCircle.classList.remove('animate-breathe');
             mainCircle.style.transform = transform;
             void mainCircle.offsetWidth; // Force Reflow
+
+            // Complete the progress ring then fade it out
+            progressFillEl.style.strokeDashoffset = 0;
+            setTimeout(() => { progressFillEl.style.opacity = '0'; }, 600);
 
             // Shrink entire container and turn green
             mainCircle.style.transition = 'transform 1.2s ease, background-color 1.2s ease';
@@ -2393,6 +3919,16 @@
 
             breatheText.style.opacity = '0';
             checkSvgEl.classList.add('active');
+
+            // Compose summary line: "+5m today · 3 day streak"
+            const log = getSessionLog();
+            const streak = calcStreak(log);
+            const todayKey = dayKey(new Date());
+            let mtoday = 0;
+            for (let i = 0; i < log.length; i++) if (log[i].date === todayKey) mtoday += log[i].mins;
+            const streakPart = streak > 0 ? streak + ' day streak' : 'first session today';
+            s4SummaryEl.innerHTML = '<strong>+' + sessionMins + 'm</strong> today · ' + streakPart;
+
             s4UIEl.classList.add('active');
         }
 
