@@ -6,8 +6,15 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ZenBreath">
     <meta name="theme-color" content="#000000">
+    <meta name="color-scheme" content="dark">
+    <!-- Stop iOS from auto-linking phone numbers / dates / addresses inside
+         the rotating intentions and quotes — those auto-links flash blue
+         and break the meditative aesthetic. -->
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
     <title>ZenBreath</title>
     <style>
         :root {
@@ -270,31 +277,6 @@
             justify-content: center;
         }
 
-        /* Progress ring sits behind the circle at its maximum scale boundary */
-        .progress-ring {
-            position: absolute;
-            width: clamp(280px, 78vw, 540px);
-            height: clamp(280px, 78vw, 540px);
-            pointer-events: none;
-            transform: rotate(-90deg);
-        }
-
-        .progress-track {
-            fill: none;
-            stroke: rgba(255, 255, 255, 0.06);
-            stroke-width: 1.5;
-        }
-
-        .progress-fill {
-            fill: none;
-            stroke: rgba(255, 255, 255, 0.45);
-            stroke-width: 1.5;
-            stroke-linecap: round;
-            stroke-dasharray: 603.19; /* 2*PI*96 */
-            stroke-dashoffset: 603.19;
-            transition: stroke-dashoffset 0.6s linear, opacity 0.8s ease;
-        }
-
         /* Container scales rapidly (GPU Accelerated Breathing) */
         .circle {
             width: clamp(250px, 70vw, 500px);
@@ -339,6 +321,14 @@
 
         .animate-breathe {
             animation: breatheCycle 12s infinite linear;
+        }
+
+        /* Freeze the breathing pulse while a confirmation dialog is open.
+           Pausing — rather than ending — keeps the circle at whatever
+           scale it was on, and the rhythm resumes from the same frame
+           the moment the user taps Keep breathing. */
+        body.confirm-open .animate-breathe {
+            animation-play-state: paused;
         }
 
         .breathe-text {
@@ -564,8 +554,10 @@
         .streak-screen {
             overflow-y: auto;
             justify-content: flex-start;
-            /* Bottom padding reserves space for the fixed audio-btn so the heatmap legend isn't hidden under it */
-            padding: 6vh 1.5rem calc(max(env(safe-area-inset-bottom, 18px), 18px) + 70px);
+            /* Audio control is hidden on this screen (body.streak-open
+               .audio-control), so the bottom padding only needs to clear
+               the streak-cta button at the end of the content. */
+            padding: 6vh 1.5rem calc(max(env(safe-area-inset-bottom, 18px), 18px) + 60px);
             z-index: 200;
             /* Fully obscure underlying screens */
             background-color: var(--bg);
@@ -653,6 +645,33 @@
             margin-top: 0.3rem;
         }
 
+        /* Sub-line under the streak label that gives the user a goal:
+           "X days to a Y-day streak" / "Personal best · keep going" /
+           "Begin your first session to start a streak". The whole point
+           is to turn an otherwise lonely "0" into actionable encouragement. */
+        .streak-milestone {
+            margin-top: 0.7rem;
+            font-size: 0.82rem;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.55);
+            letter-spacing: 0.04em;
+            line-height: 1.4;
+            min-height: 1.2em;
+            padding: 0 1rem;
+            text-align: center;
+            transition: color 0.4s ease, opacity 0.4s ease;
+        }
+        .streak-milestone.best {
+            color: rgba(255, 215, 102, 0.92);
+        }
+        .streak-milestone.empty {
+            color: rgba(255, 255, 255, 0.42);
+        }
+        .streak-milestone .accent {
+            color: var(--success);
+            font-weight: 500;
+        }
+
         /* --- Stats panel --- */
         .streak-stats {
             display: grid;
@@ -687,6 +706,23 @@
             text-overflow: clip;
         }
 
+        /* Tiny icon above each stat value — gives the cards a visual identity
+           without crowding them. Stays subtle (low opacity, thin stroke) so
+           the numbers remain the focal point. */
+        .stat-icon {
+            width: 16px;
+            height: 16px;
+            color: rgba(129, 199, 132, 0.65);
+            margin: 0 auto 0.3rem;
+            display: block;
+        }
+        .stat-card.empty .stat-icon {
+            color: rgba(255, 255, 255, 0.18);
+        }
+        .stat-card.empty .stat-value {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
         @media (hover: hover) and (pointer: fine) {
             .stat-card:hover {
                 background: var(--surface-2);
@@ -718,8 +754,13 @@
             width: 100%;
             max-width: 500px;
             margin: 3rem auto 2rem;
-            overflow-x: auto;
-            /* Allow sideways scrolling on tiny phones if needed */
+            /* No overflow-x:auto here — setting it auto-sets overflow-y to
+               auto in browsers, which then clips the chart-bar-wraps when
+               their content (mins-label + bar + day-label) gets taller than
+               the chart-container. Without it the bars render correctly on
+               every breakpoint. The chart itself doesn't actually need
+               horizontal scroll: chart-container's min-width keeps it
+               visible on tiny phones. */
         }
 
         .chart-title {
@@ -931,6 +972,29 @@
         .heatmap-legend .heatmap-cell {
             width: 10px;
             height: 10px;
+        }
+
+        /* The streak screen is for stat review, not breathing. Hiding the
+           floating audio button removes the visual collision with the
+           "Begin Session" CTA at the bottom and keeps the panel calm. */
+        body.streak-open .audio-control,
+        body.streak-open .audio-popover {
+            display: none;
+        }
+
+        /* Streak-screen primary CTA — saves a navigation hop. The user
+           lands here, sees their progress, and can begin a session
+           without bouncing back to home first.
+
+           Reuses .btn for visual consistency, then overrides the spacing
+           (.btn pins itself to the bottom of its flex parent via
+           margin-top: auto + 15vh bottom; both are wrong here). */
+        .streak-cta {
+            display: block;
+            margin: 2rem auto 0;
+            padding: 0.95rem 2.4rem;
+            font-size: 1.05rem;
+            min-height: 50px;
         }
 
         /* --- Audio button + popover --- */
@@ -1246,6 +1310,33 @@
             height: 14px;
             color: rgba(255, 255, 255, 0.5);
             flex-shrink: 0;
+            transition: color 0.18s var(--ease-fluid);
+        }
+
+        /* Swap the speaker waves for the crossed-out mute X when the slider
+           is at 0 — same idiom as a laptop's F1 mute key. Use opacity so
+           the swap fades cleanly instead of snapping.
+
+           Both states are present in the DOM at the same fixed viewBox, so
+           the icon size stays identical across phones, tablets, and desktop
+           — no layout shift on toggle. */
+        .audio-volume-icon .audio-volume-wave,
+        .audio-volume-icon .audio-volume-mute {
+            transition: opacity 0.18s var(--ease-fluid);
+        }
+        .audio-volume-icon .audio-volume-mute {
+            opacity: 0;
+        }
+        .audio-volume-icon.muted .audio-volume-wave {
+            opacity: 0;
+        }
+        .audio-volume-icon.muted .audio-volume-mute {
+            opacity: 1;
+        }
+        /* When fully muted the icon goes a touch warmer / dimmer so the
+           "this is silent" state is communicated by colour as well as glyph. */
+        .audio-volume-icon.muted {
+            color: rgba(255, 255, 255, 0.35);
         }
 
         .audio-slider {
@@ -1447,11 +1538,6 @@
                 height: clamp(280px, 60vw, 420px);
             }
 
-            .progress-ring {
-                width: clamp(310px, 66vw, 470px);
-                height: clamp(310px, 66vw, 470px);
-            }
-
             .breathe-text {
                 font-size: 2rem;
             }
@@ -1464,9 +1550,10 @@
             }
 
             /* Streak panel — roomier than mobile, tighter than the desktop
-               default so the year heatmap doesn't get cropped or scroll. */
+               default. Audio control is hidden on this screen, so bottom
+               padding only reserves space for the streak-cta button. */
             .streak-screen {
-                padding: 5vh 2rem calc(max(env(safe-area-inset-bottom, 18px), 18px) + 80px);
+                padding: 5vh 2rem calc(max(env(safe-area-inset-bottom, 18px), 18px) + 70px);
             }
             .streak-quote {
                 font-size: 1.15rem;
@@ -1538,11 +1625,6 @@
                 height: clamp(220px, 38vh, 320px);
             }
 
-            .progress-ring {
-                width: clamp(250px, 44vh, 370px);
-                height: clamp(250px, 44vh, 370px);
-            }
-
             .breathe-text {
                 font-size: 1.8rem;
             }
@@ -1559,9 +1641,13 @@
 
             /* Streak — has to fit under 744px on iPad mini landscape.
                Every margin and font-size below is shaved from the
-               desktop defaults so the heatmap stays in view. */
+               desktop defaults so the heatmap stays in view. The bottom
+               padding clears the streak-cta button at the end of the
+               content. The audio control is hidden on this screen
+               (see body.streak-open .audio-control rule) so it doesn't
+               need clearance here. */
             .streak-screen {
-                padding: 3.5vh 1.6rem calc(max(env(safe-area-inset-bottom, 14px), 14px) + 60px);
+                padding: 3.5vh 1.6rem calc(max(env(safe-area-inset-bottom, 14px), 14px) + 80px);
             }
             .streak-quote {
                 font-size: 1rem;
@@ -2023,13 +2109,6 @@
                 margin-bottom: 0.5rem;
             }
 
-            /* Progress ring must be height-bounded on landscape — viewport is ~375px tall
-               and the portrait clamp would clip off-screen */
-            .progress-ring {
-                width: clamp(180px, 70vh, 290px);
-                height: clamp(180px, 70vh, 290px);
-            }
-
             /* Landscape phones: audio button needs to clear the side notch / nav bar
                and not collide with primary .btn (Begin / Home) which sits at bottom */
             .audio-control {
@@ -2079,6 +2158,287 @@
             transition: opacity 0.2s ease;
         }
 
+        /* End-session affordance + confirmation modal --------------------
+           Subtle "End" pill in the top-left of the breathing screen,
+           mirroring the back-button idiom used on the quotes/streak
+           panels. Reveal is delayed 1.5s into a session so a finger
+           still falling from the Begin tap can't immediately end it.
+           Tapping it — or pressing Escape, swiping the browser back,
+           or closing the tab — surfaces the confirm dialog below. */
+        .end-session-btn {
+            position: absolute;
+            top: max(env(safe-area-inset-top, 12px), 12px);
+            left: 16px;
+            background: rgba(0, 0, 0, 0);
+            border: 1px solid var(--hairline);
+            border-radius: 2rem;
+            padding: 0.5rem 1rem;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 6;
+            font-family: inherit;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition:
+                opacity 1.2s var(--ease-fluid),
+                background-color var(--dur-base) var(--ease-fluid),
+                color var(--dur-base) var(--ease-fluid),
+                border-color var(--dur-base) var(--ease-fluid),
+                transform var(--dur-fast) var(--ease-fluid);
+        }
+
+        .end-session-btn.visible {
+            opacity: 0.55;
+            pointer-events: auto;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .end-session-btn.visible:hover {
+                background: var(--surface-3);
+                border-color: var(--hairline-strong);
+                color: #fff;
+                opacity: 1;
+                transform: scale(1.04);
+            }
+        }
+
+        .end-session-btn:active {
+            transform: scale(0.94);
+            transition-duration: var(--dur-fast);
+        }
+
+        /* Confirm dialog. Sits above every other layer (audio popover,
+           streak/quotes panels) so it can't be visually buried. */
+        .confirm-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.38s var(--ease-fluid);
+        }
+
+        .confirm-modal.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .confirm-backdrop {
+            position: absolute;
+            inset: 0;
+            /* Backdrop fades from fully transparent / no blur to the final
+               look. Animating the filter as well as the background gives
+               the modal a clear "pulling focus" feel on every device. */
+            background: rgba(0, 0, 0, 0);
+            backdrop-filter: blur(0);
+            -webkit-backdrop-filter: blur(0);
+            transition:
+                background-color 0.42s var(--ease-fluid),
+                backdrop-filter 0.42s var(--ease-fluid),
+                -webkit-backdrop-filter 0.42s var(--ease-fluid);
+        }
+
+        .confirm-modal.open .confirm-backdrop {
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+
+        /* Thin progress bar under the body line. Visual reinforcement of
+           "you've done real work" — pairs with the End button's "log Xm"
+           label so quitting feels like cashing in, not throwing away. */
+        .confirm-progress {
+            height: 3px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 2px;
+            margin: 0 0 1.2rem;
+            overflow: hidden;
+        }
+
+        .confirm-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--success-soft);
+            transition: width 0.5s var(--ease-out-soft);
+        }
+
+        .confirm-dialog {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            /* Closed state: smaller, slightly below final position, hazy. The
+               spring-easing on transform plus opacity-fade gives the dialog
+               a confident pop into place without feeling jumpy. */
+            transform: translate(-50%, calc(-50% + 24px)) scale(0.8);
+            opacity: 0;
+            filter: blur(4px);
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 1.2rem;
+            padding: 1.5rem 1.4rem 1.2rem;
+            width: min(360px, calc(100vw - 32px));
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.55),
+                0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+            transition:
+                transform 0.5s var(--ease-spring),
+                opacity 0.32s var(--ease-fluid),
+                filter 0.32s var(--ease-fluid);
+        }
+
+        .confirm-modal.open .confirm-dialog {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+            filter: blur(0);
+        }
+
+        /* Staggered reveal for the dialog contents — title first, then
+           body, progress bar, and buttons cascade in. Using @keyframes
+           (not CSS transitions) so the cascade is one-shot on open and
+           doesn't fight with button hover transforms after entrance. */
+        @keyframes confirmContentIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .confirm-modal.open .confirm-title {
+            animation: confirmContentIn 0.42s var(--ease-spring) 0.08s both;
+        }
+
+        .confirm-modal.open .confirm-body {
+            animation: confirmContentIn 0.42s var(--ease-spring) 0.14s both;
+        }
+
+        .confirm-modal.open .confirm-progress {
+            animation: confirmContentIn 0.42s var(--ease-spring) 0.20s both;
+        }
+
+        .confirm-modal.open .confirm-btn:nth-child(1) {
+            animation: confirmContentIn 0.42s var(--ease-spring) 0.26s both;
+        }
+
+        .confirm-modal.open .confirm-btn:nth-child(2) {
+            animation: confirmContentIn 0.42s var(--ease-spring) 0.32s both;
+        }
+
+        .confirm-title {
+            font-size: 1.25rem;
+            font-weight: 400;
+            color: var(--fg);
+            margin: 0 0 0.5rem;
+            text-align: center;
+            letter-spacing: 0.01em;
+        }
+
+        .confirm-body {
+            font-size: 0.95rem;
+            font-weight: 300;
+            color: rgba(255, 255, 255, 0.65);
+            text-align: center;
+            line-height: 1.5;
+            margin: 0 0 1.3rem;
+            min-height: 1.5em;
+        }
+
+        .confirm-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+        }
+
+        .confirm-btn {
+            position: relative;
+            width: 100%;
+            border-radius: 2.5rem;
+            padding: 0.85rem 1.2rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            font-family: inherit;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            /* Baseline shadow + zero-blur halo so the hover transition has
+               somewhere to spring from. Matches the main app .btn idiom. */
+            box-shadow:
+                0 1px 0 rgba(0, 0, 0, 0.06),
+                0 0 0 0 rgba(255, 255, 255, 0);
+            transition:
+                background-color var(--dur-base) var(--ease-fluid),
+                color var(--dur-base) var(--ease-fluid),
+                border-color var(--dur-base) var(--ease-fluid),
+                transform var(--dur-fast) var(--ease-fluid),
+                box-shadow var(--dur-base) var(--ease-fluid);
+        }
+
+        .confirm-btn-primary {
+            background: var(--fg);
+            color: var(--bg);
+        }
+
+        .confirm-btn-secondary {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.65);
+            border-color: var(--hairline);
+        }
+
+        /* Hover only fires on devices with a real pointer — keeps the
+           lifted look from sticking on touch after a tap. */
+        @media (hover: hover) and (pointer: fine) {
+            .confirm-btn-primary:hover {
+                background: #f5f5f7;
+                transform: translateY(-2px);
+                box-shadow:
+                    0 12px 28px rgba(255, 255, 255, 0.14),
+                    0 0 0 1px rgba(255, 255, 255, 0.35);
+            }
+            .confirm-btn-secondary:hover {
+                background: var(--surface-3);
+                color: #fff;
+                border-color: var(--hairline-strong);
+                transform: translateY(-2px);
+                box-shadow: 0 8px 18px rgba(255, 255, 255, 0.06);
+            }
+        }
+
+        /* Tap / click: settle back to baseline Y with a crisp shrink so
+           touch devices get clear press feedback without needing :hover. */
+        .confirm-btn:active {
+            transform: translateY(0) scale(0.96);
+            transition-duration: var(--dur-fast);
+            box-shadow:
+                0 2px 6px rgba(255, 255, 255, 0.06),
+                0 0 0 1px rgba(255, 255, 255, 0.18);
+        }
+
+        /* Visible focus ring for keyboard users (laptops, Chromebooks,
+           switch-control / VoiceOver navigation). Inherits the success
+           accent used elsewhere for focus. */
+        .confirm-btn:focus-visible {
+            outline: 2px solid var(--success-soft);
+            outline-offset: 3px;
+        }
+
+        /* Solid backdrop fallback for environments without backdrop-filter
+           (older Firefox, locked-down Chromebook profiles). Same idiom as
+           the audio-popover fallback further up. */
+        @supports not ((backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px))) {
+            .confirm-backdrop {
+                background: rgba(0, 0, 0, 0.85);
+            }
+        }
+
         /* Honor reduced-motion users by stripping non-essential animations.
            The breathing cycle is preserved — it's the core meditation feedback. */
         @media (prefers-reduced-motion: reduce) {
@@ -2096,7 +2456,6 @@
             }
 
             .audio-popover,
-            .progress-fill,
             .check-svg,
             .check-svg .check-path {
                 transition: opacity 0.1s ease;
@@ -2135,6 +2494,36 @@
             .screen {
                 transition: opacity 0.15s ease;
             }
+
+            .end-session-btn {
+                transition: opacity 0.2s ease !important;
+            }
+
+            .confirm-modal,
+            .confirm-backdrop,
+            .confirm-dialog,
+            .confirm-btn {
+                transition: opacity 0.12s ease !important;
+            }
+
+            .confirm-modal.open .confirm-dialog {
+                transform: translate(-50%, -50%) !important;
+                filter: none !important;
+            }
+
+            /* Drop the staggered cascade — instant reveal at full opacity. */
+            .confirm-modal.open .confirm-title,
+            .confirm-modal.open .confirm-body,
+            .confirm-modal.open .confirm-progress,
+            .confirm-modal.open .confirm-btn {
+                animation: none !important;
+                opacity: 1 !important;
+                transform: none !important;
+            }
+
+            /* The breathing pulse pause is honored regardless of motion
+               preference — pausing is itself a "less motion" choice and
+               matches what the user expects from the dialog modality. */
         }
     </style>
 </head>
@@ -2176,11 +2565,21 @@
         </button>
     </div>
 
-    <div class="audio-popover" id="audioPopover">
+    <div class="audio-popover" id="audioPopover" role="dialog" aria-modal="true"
+        aria-label="Ambient sound picker" aria-hidden="true">
         <div class="audio-volume">
-            <svg class="audio-volume-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg class="audio-volume-icon" id="audioVolumeIcon" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                aria-hidden="true">
                 <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                <!-- Sound waves: visible when volume > 0. Same stack as the audio
+                     button so both icons read identically across the app. -->
+                <path class="audio-volume-wave" d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                <path class="audio-volume-wave" d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                <!-- Crossed-out speaker (laptop F1 mute glyph): visible when the
+                     slider is dragged all the way to 0. -->
+                <line class="audio-volume-mute" x1="23" y1="9" x2="17" y2="15" />
+                <line class="audio-volume-mute" x1="17" y1="9" x2="23" y2="15" />
             </svg>
             <input type="range" id="audioVolume" class="audio-slider" min="0" max="100" value="50"
                 aria-label="Volume" />
@@ -2212,7 +2611,7 @@
         <button class="btn" onclick="nav('s2')">Start Breathing</button>
     </div>
 
-    <div id="s2" class="screen">
+    <div id="s2" class="screen" inert>
         <h2 style="margin-top: 5vh;">Select Duration</h2>
         <div class="picker-wrapper">
             <div id="pickerOverlay" class="picker-overlay" onclick="startSession()">
@@ -2223,12 +2622,9 @@
         <button class="btn" onclick="startSession()">Begin</button>
     </div>
 
-    <div id="s34" class="screen">
+    <div id="s34" class="screen" inert>
+        <button class="end-session-btn" id="endSessionBtn" type="button" aria-label="End session early">End</button>
         <div class="circle-stage">
-            <svg class="progress-ring" viewBox="0 0 200 200" aria-hidden="true">
-                <circle class="progress-track" cx="100" cy="100" r="96" />
-                <circle id="progressFill" class="progress-fill" cx="100" cy="100" r="96" />
-            </svg>
             <div id="mainCircle" class="circle">
                 <svg id="checkSvg" class="check-svg" viewBox="0 0 52 52">
                     <path class="check-path" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"
@@ -2245,30 +2641,47 @@
     </div>
 
     <!-- Quotes Screen -->
-    <div id="quotesScreen" class="screen quotes-screen">
+    <div id="quotesScreen" class="screen quotes-screen" inert>
         <button class="streak-back" onclick="closeQuotes()">&larr; Back</button>
         <h2 style="margin-top: 5vh; text-align: center;">Quotes</h2>
         <div class="quotes-feed" id="quotesFeed"></div>
     </div>
 
     <!-- Streak Screen -->
-    <div id="streakScreen" class="screen streak-screen">
+    <div id="streakScreen" class="screen streak-screen" inert>
         <button class="streak-back" onclick="closeStreak()">&larr; Back</button>
         <div class="streak-quote" id="streakQuote"></div>
         <div class="streak-counter">
             <div class="streak-number" id="streakNumber">0</div>
             <div class="streak-label">day streak</div>
+            <!-- Goal hint populated by renderStreakScreen — turns "0" from
+                 a depressing zero into a clear next step. -->
+            <div class="streak-milestone" id="streakMilestone" aria-live="polite"></div>
         </div>
         <div class="streak-stats" id="streakStats">
-            <div class="stat-card">
+            <div class="stat-card" id="statCardLongest">
+                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
                 <div class="stat-value" id="statLongest">0</div>
                 <div class="stat-label">Longest</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" id="statCardSessions">
+                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="m8.5 12 2.5 2.5L15.5 10" />
+                </svg>
                 <div class="stat-value" id="statSessions">0</div>
                 <div class="stat-label">Sessions</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" id="statCardTime">
+                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3.5 2" />
+                </svg>
                 <div class="stat-value" id="statTime">0m</div>
                 <div class="stat-label">Total time</div>
             </div>
@@ -2302,6 +2715,45 @@
                 <span>More</span>
             </div>
         </div>
+        <button class="btn streak-cta" id="streakCta" onclick="streakStart()">Begin Session</button>
+    </div>
+
+    <!-- First-visit notification permission prompt. Pre-prompt pattern:
+         we explain the value in our own UI before triggering the native
+         OS prompt, which protects the grant rate (a denied browser-level
+         permission can only be reset by the user via browser settings). -->
+    <div class="confirm-modal" id="notifPromptModal" role="dialog" aria-modal="true"
+        aria-labelledby="notifPromptTitle" aria-describedby="notifPromptBody" aria-hidden="true" inert>
+        <div class="confirm-backdrop" id="notifPromptBackdrop"></div>
+        <div class="confirm-dialog" role="document">
+            <h3 class="confirm-title" id="notifPromptTitle">Weekly reminders?</h3>
+            <p class="confirm-body" id="notifPromptBody">
+                ZenBreath can nudge you once a week to take a few breaths. You can change this any time in your browser settings.
+            </p>
+            <div class="confirm-actions">
+                <button class="confirm-btn confirm-btn-primary" id="notifPromptYes" type="button">Yes, remind me</button>
+                <button class="confirm-btn confirm-btn-secondary" id="notifPromptNo" type="button">No thanks</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- End-session confirmation. Hosts both the dimming backdrop and the
+         centered dialog. `inert` blocks tab-stops + screen reader access
+         while closed, and is removed when openEndConfirm() runs. -->
+    <div class="confirm-modal" id="endConfirmModal" role="dialog" aria-modal="true"
+        aria-labelledby="endConfirmTitle" aria-describedby="endConfirmBody" aria-hidden="true" inert>
+        <div class="confirm-backdrop" id="endConfirmBackdrop"></div>
+        <div class="confirm-dialog" role="document">
+            <h3 class="confirm-title" id="endConfirmTitle">End session early?</h3>
+            <p class="confirm-body" id="endConfirmBody"></p>
+            <div class="confirm-progress" aria-hidden="true">
+                <div class="confirm-progress-fill" id="endConfirmProgressFill"></div>
+            </div>
+            <div class="confirm-actions">
+                <button class="confirm-btn confirm-btn-primary" id="endConfirmKeep" type="button">Keep breathing</button>
+                <button class="confirm-btn confirm-btn-secondary" id="endConfirmEnd" type="button">End session</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -2317,9 +2769,7 @@
         const s34El = document.getElementById('s34');
         const checkSvgEl = document.getElementById('checkSvg');
         const s4UIEl = document.getElementById('s4UI');
-        const progressFillEl = document.getElementById('progressFill');
         const s4SummaryEl = document.getElementById('s4Summary');
-        const PROGRESS_CIRCUMFERENCE = 603.19; // 2 * PI * 96, kept in sync with the SVG radius
         const quotesScreenEl = document.getElementById('quotesScreen');
         const streakScreenEl = document.getElementById('streakScreen');
         const screenEls = document.querySelectorAll('.screen');
@@ -2977,11 +3427,19 @@
             const activeScreen = document.querySelector('.screen.active');
             if (activeScreen && activeScreen.id !== 'streakScreen') previousScreen = activeScreen.id;
             nav('streakScreen');
+            // Land at the top every time — the streak hero is the point of
+            // arrival, not the heatmap legend at the bottom.
+            streakScreenEl.scrollTop = 0;
             streakBtnEl.style.display = 'none';
             quotesBtnEl.style.display = 'none';
+            // Hide the floating audio button on this panel — it would
+            // collide with the Begin Session CTA at the bottom and the
+            // user is reviewing stats here, not playing ambience.
+            document.body.classList.add('streak-open');
             renderStreakScreen();
         }
         function closeStreak() {
+            document.body.classList.remove('streak-open');
             nav(previousScreen);
             if (previousScreen !== 's34') {
                 streakBtnEl.style.display = '';
@@ -2991,6 +3449,7 @@
 
         const streakQuoteEl = document.getElementById('streakQuote');
         const streakNumberEl = document.getElementById('streakNumber');
+        const streakMilestoneEl = document.getElementById('streakMilestone');
         const streakChartEl = document.getElementById('streakChart');
         const heatmapGridEl = document.getElementById('heatmapGrid');
         const heatmapMonthsEl = document.getElementById('heatmapMonths');
@@ -2998,6 +3457,56 @@
         const statLongestEl = document.getElementById('statLongest');
         const statSessionsEl = document.getElementById('statSessions');
         const statTimeEl = document.getElementById('statTime');
+        const statCardLongestEl = document.getElementById('statCardLongest');
+        const statCardSessionsEl = document.getElementById('statCardSessions');
+        const statCardTimeEl = document.getElementById('statCardTime');
+
+        /* Milestones the streak page nudges users toward.  Tightly spaced
+           early so a brand-new user has a goal in reach within the week,
+           then widening as commitment grows. */
+        const STREAK_MILESTONES = [3, 7, 14, 30, 60, 90, 180, 365];
+        function nextMilestone(streak) {
+            for (let i = 0; i < STREAK_MILESTONES.length; i++) {
+                if (streak < STREAK_MILESTONES[i]) return STREAK_MILESTONES[i];
+            }
+            return null;
+        }
+
+        /* Builds the goal-line shown under the streak number. Returns
+           {text, cls} where `cls` is appended to the milestone element so
+           CSS can tint personal-best moments differently. */
+        function buildMilestoneCopy(streak, longest, sessions) {
+            if (sessions === 0) {
+                return { text: 'Begin your first session to start a streak', cls: 'empty' };
+            }
+            if (streak === 0) {
+                return { text: 'Begin a session today to restart your streak', cls: 'empty' };
+            }
+            // Personal-best moment trumps the milestone copy — it's a bigger
+            // emotional beat than "X days to Y".
+            if (longest > 0 && streak === longest && streak >= 3) {
+                return { text: 'Personal best · keep going', cls: 'best' };
+            }
+            const next = nextMilestone(streak);
+            if (next === null) {
+                return { text: 'Beyond every milestone · keep flowing', cls: 'best' };
+            }
+            const remaining = next - streak;
+            const dayLabel = remaining === 1 ? 'day' : 'days';
+            return {
+                text: remaining + ' ' + dayLabel + ' to a ' + next + '-day streak',
+                cls: ''
+            };
+        }
+
+        /* Leaving the streak panel into a fresh session — saves the user
+           bouncing back through Home → Begin → Duration. */
+        function streakStart() {
+            document.body.classList.remove('streak-open');
+            streakBtnEl.style.display = '';
+            quotesBtnEl.style.display = '';
+            nav('s2');
+        }
 
         function heatmapLevel(mins) {
             if (mins <= 0) return 0;
@@ -3056,22 +3565,44 @@
 
             // Single shared session log read for streak number + chart + stats
             const log = getSessionLog();
-            streakNumberEl.textContent = calcStreak(log);
+            const streak = calcStreak(log);
+            streakNumberEl.textContent = streak;
 
-            // Stats panel
+            // Stats panel — show "—" instead of zeros for first-time users so
+            // the page reads as inviting rather than a wall of "0".
             const stats = calcStats(log);
-            statLongestEl.textContent = stats.longest;
-            statSessionsEl.textContent = stats.sessions;
-            statTimeEl.textContent = formatTotalTime(stats.totalMins);
+            const isEmpty = stats.sessions === 0;
+            statLongestEl.textContent = isEmpty ? '—' : stats.longest;
+            statSessionsEl.textContent = isEmpty ? '—' : stats.sessions;
+            statTimeEl.textContent = isEmpty ? '—' : formatTotalTime(stats.totalMins);
+            statCardLongestEl.classList.toggle('empty', isEmpty);
+            statCardSessionsEl.classList.toggle('empty', isEmpty);
+            statCardTimeEl.classList.toggle('empty', isEmpty);
 
-            // Chart
+            // Milestone / encouragement line under the streak number.
+            const milestone = buildMilestoneCopy(streak, stats.longest, stats.sessions);
+            streakMilestoneEl.textContent = milestone.text;
+            streakMilestoneEl.className = 'streak-milestone' + (milestone.cls ? ' ' + milestone.cls : '');
+
+            // Chart — scale bars against the *actual* container height (which
+            // varies per breakpoint: 100px landscape iPad, 130px mobile,
+            // 140px iPad portrait, 160px desktop). The previous fixed 140px
+            // multiplier overflowed the title on shorter viewports because
+            // the wrap stack ((mins) + bar + (day)) would stretch past
+            // container height and float above its top edge.
             streakChartEl.textContent = '';
             const days = getLast7Days(log);
             let maxMins = 1;
             for (let i = 0; i < days.length; i++) if (days[i].mins > maxMins) maxMins = days[i].mins;
 
+            // Reserve space for the mins-label above and the day-label below
+            // each bar so the bar's own height can't push the wrap past the
+            // container. Floor at 40px so a tiny landscape strip still has
+            // visible bars.
+            const containerH = streakChartEl.clientHeight || 130;
+            const maxBarPx = Math.max(40, containerH - 36);
+
             const frag = document.createDocumentFragment();
-            const bars = new Array(days.length);
             for (let i = 0; i < days.length; i++) {
                 const d = days[i];
                 const wrap = document.createElement('div');
@@ -3081,7 +3612,14 @@
                 minsLabel.textContent = d.mins > 0 ? d.mins + 'm' : '';
                 const bar = document.createElement('div');
                 bar.className = 'chart-bar' + (d.mins === 0 ? ' empty' : '') + (d.isToday ? ' today' : '');
-                bar.style.height = '3px';
+                // Set the final height inline at creation. The previous
+                // start-at-3px-then-rAF-grow approach relied on CSS
+                // transitions firing reliably on first paint, which they
+                // don't in some environments (paused iframes, restored
+                // bfcache pages, automation harnesses). Going straight to
+                // target is reliable and the chart still feels lively from
+                // the colour and the today bar's glow.
+                bar.style.height = d.mins > 0 ? Math.max(8, (d.mins / maxMins) * maxBarPx) + 'px' : '3px';
                 const label = document.createElement('div');
                 label.className = 'chart-day' + (d.isToday ? ' today' : '');
                 label.textContent = d.isToday ? 'Today' : d.label;
@@ -3089,15 +3627,8 @@
                 wrap.appendChild(bar);
                 wrap.appendChild(label);
                 frag.appendChild(wrap);
-                bars[i] = { bar, target: d.mins > 0 ? Math.max(8, (d.mins / maxMins) * 140) + 'px' : '3px' };
             }
             streakChartEl.appendChild(frag);
-            // Single double-rAF to flush all bar heights together
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    for (let i = 0; i < bars.length; i++) bars[i].bar.style.height = bars[i].target;
-                });
-            });
 
             // Year heatmap
             renderHeatmap(log);
@@ -3446,6 +3977,7 @@
         function toggleAudioPopover() {
             popoverOpen = !popoverOpen;
             audioPopoverEl.classList.toggle('open', popoverOpen);
+            audioPopoverEl.setAttribute('aria-hidden', popoverOpen ? 'false' : 'true');
             document.body.classList.toggle('popover-open', popoverOpen);
         }
 
@@ -3453,6 +3985,7 @@
             if (!popoverOpen) return;
             popoverOpen = false;
             audioPopoverEl.classList.remove('open');
+            audioPopoverEl.setAttribute('aria-hidden', 'true');
             document.body.classList.remove('popover-open');
         }
 
@@ -3645,28 +4178,37 @@
 
         // Volume slider
         const audioVolumeEl = document.getElementById('audioVolume');
+        const audioVolumeIconEl = document.getElementById('audioVolumeIcon');
+
+        // Toggle the muted-glyph state on the speaker icon. Single source of
+        // truth so the slider-input handler and the initial-load path stay
+        // consistent.
+        function syncVolumeIcon(pct) {
+            audioVolumeIconEl.classList.toggle('muted', pct <= 0);
+        }
+
         function setVolumePct(pct) {
             const clamped = Math.max(0, Math.min(100, pct | 0));
             userVolume = clamped / 100;
             audioVolumeEl.value = clamped;
             audioVolumeEl.style.setProperty('--vol-pct', clamped + '%');
+            syncVolumeIcon(clamped);
             applyVolume();
             storageSet('zen_volume', String(clamped));
         }
         {
             const savedVol = storageGet('zen_volume', null);
+            let initialVol = 50;
             if (savedVol !== null) {
                 const v = parseInt(savedVol, 10);
                 if (!isNaN(v)) {
-                    userVolume = Math.max(0, Math.min(100, v)) / 100;
-                    audioVolumeEl.value = v;
-                    audioVolumeEl.style.setProperty('--vol-pct', v + '%');
-                } else {
-                    audioVolumeEl.style.setProperty('--vol-pct', '50%');
+                    initialVol = Math.max(0, Math.min(100, v));
+                    userVolume = initialVol / 100;
+                    audioVolumeEl.value = initialVol;
                 }
-            } else {
-                audioVolumeEl.style.setProperty('--vol-pct', '50%');
             }
+            audioVolumeEl.style.setProperty('--vol-pct', initialVol + '%');
+            syncVolumeIcon(initialVol);
         }
 
         audioVolumeEl.addEventListener('input', (e) => {
@@ -3733,9 +4275,17 @@
         });
 
         function nav(id) {
-            for (let i = 0; i < screenEls.length; i++) screenEls[i].classList.remove('active');
-            const target = document.getElementById(id);
-            if (target) target.classList.add('active');
+            // Flip `.active` and `inert` together. `inert` (Chrome 102+,
+            // Safari 15.5+, all modern Android browsers) hides inactive
+            // screens from the tab order and the screen reader tree, which
+            // pure opacity:0 + pointer-events:none does not.
+            for (let i = 0; i < screenEls.length; i++) {
+                const el = screenEls[i];
+                const isTarget = el.id === id;
+                el.classList.toggle('active', isTarget);
+                if (isTarget) el.removeAttribute('inert');
+                else el.setAttribute('inert', '');
+            }
         }
 
         // Picker layout cache — invalidated on resize / orientation change
@@ -3804,6 +4354,38 @@
 
         let arrowScrolling = false;
         document.addEventListener('keydown', (e) => {
+            // Escape unwinds the topmost layer: popover first, then the
+            // streak / quotes screens. Focus returns to whatever opened
+            // them so keyboard users don't get dumped on the body.
+            if (e.key === 'Escape') {
+                if (popoverOpen) {
+                    e.preventDefault();
+                    closeAudioPopover();
+                    audioBtnEl.focus();
+                    return;
+                }
+                if (streakScreenEl.classList.contains('active')) {
+                    e.preventDefault();
+                    closeStreak();
+                    streakBtnEl.focus();
+                    return;
+                }
+                if (quotesScreenEl.classList.contains('active')) {
+                    e.preventDefault();
+                    closeQuotes();
+                    quotesBtnEl.focus();
+                    return;
+                }
+                // From the duration picker, Escape goes home rather than
+                // dropping the press silently — matches the "Back" affordance
+                // every other screen exposes.
+                if (s2El.classList.contains('active')) {
+                    e.preventDefault();
+                    nav('s1');
+                    return;
+                }
+            }
+
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (s1El.classList.contains('active')) {
@@ -3836,23 +4418,23 @@
             requestWakeLock();
             startWakeLockMonitor();
 
+            // Arm the leave-confirmation hooks for this session.
+            sessionStartedAt = performance.now();
+            installBackTrap();
+            // Reveal the End pill after a short delay so the still-falling
+            // tap from "Begin" can't accidentally trigger the confirm.
+            setTimeout(() => {
+                if (isSessionActive) endSessionBtn.classList.add('visible');
+            }, 1500);
+
             mainCircle.style.transform = 'scale(0.4)';
             breatheText.style.opacity = '1';
-
-            // Reset progress ring (no transition on the reset jump)
-            progressFillEl.style.transition = 'none';
-            progressFillEl.style.opacity = '1';
-            progressFillEl.style.strokeDashoffset = PROGRESS_CIRCUMFERENCE;
-            // Force reflow then re-enable the slow fill transition
-            void progressFillEl.getBoundingClientRect();
-            progressFillEl.style.transition = 'stroke-dashoffset 0.6s linear, opacity 0.8s ease';
 
             const start = performance.now();
             mainCircle.classList.add('animate-breathe');
 
             let textFaded = false;
             let lastBreatheText = '';
-            let lastProgressUpdate = 0;
             function loop(now) {
                 if (!isSessionActive || !s34El.classList.contains('active')) return;
 
@@ -3874,14 +4456,6 @@
                     textFaded = true;
                 }
 
-                // Progress ring — update at most twice per second to keep the linear
-                // CSS transition smoothing the visual; saves needless DOM writes.
-                if (now - lastProgressUpdate > 500) {
-                    const progress = Math.min(1, elapsed / selectedDurationMs);
-                    progressFillEl.style.strokeDashoffset = PROGRESS_CIRCUMFERENCE * (1 - progress);
-                    lastProgressUpdate = now;
-                }
-
                 if (elapsed >= selectedDurationMs) endSession();
                 else requestAnimationFrame(loop);
             }
@@ -3893,6 +4467,12 @@
             document.body.classList.remove('in-session');
             stopWakeLockMonitor();
             releaseWakeLock();
+
+            // Hide the End pill and dismiss the confirm if it happens to
+            // be open (rare race: timer fires while the user is mid-decision).
+            endSessionBtn.classList.remove('visible');
+            if (confirmOpen) closeEndConfirm(false);
+            uninstallBackTrap();
 
             // Log the completed session
             const sessionMins = Math.max(1, Math.round(selectedDurationMs / 60000));
@@ -3907,10 +4487,6 @@
             mainCircle.classList.remove('animate-breathe');
             mainCircle.style.transform = transform;
             void mainCircle.offsetWidth; // Force Reflow
-
-            // Complete the progress ring then fade it out
-            progressFillEl.style.strokeDashoffset = 0;
-            setTimeout(() => { progressFillEl.style.opacity = '0'; }, 600);
 
             // Shrink entire container and turn green
             mainCircle.style.transition = 'transform 1.2s ease, background-color 1.2s ease';
@@ -3933,6 +4509,542 @@
         }
 
         function resetToHome() { location.reload(); }
+
+        /* ── End-session confirmation ─────────────────────────────────────
+           Hooks every plausible mid-session exit path:
+
+             • Tap the visible "End" pill (touch / mouse / pen / keyboard
+               Enter or Space — `click` covers all of these).
+             • Press Escape on a desktop / laptop / Chromebook keyboard.
+             • Browser back: hardware back on Android, edge-swipe on iOS,
+               Cmd/Alt+Left, the back button on the toolbar — all fire
+               `popstate` against the entry we push on session start.
+             • Tab close, refresh, or navigate away — `beforeunload` opts
+               us into the browser's native confirm dialog.
+
+           Each path opens the same in-app modal (or, for tab close, the
+           browser's own dialog — it's not customisable in modern Chrome /
+           Firefox / Safari, but opting in is enough to prevent a silent
+           drop). */
+
+        const endSessionBtn = document.getElementById('endSessionBtn');
+        const endConfirmModal = document.getElementById('endConfirmModal');
+        const endConfirmBackdrop = document.getElementById('endConfirmBackdrop');
+        const endConfirmKeepBtn = document.getElementById('endConfirmKeep');
+        const endConfirmEndBtn = document.getElementById('endConfirmEnd');
+        const endConfirmBodyEl = document.getElementById('endConfirmBody');
+        const endConfirmProgressFillEl = document.getElementById('endConfirmProgressFill');
+
+        // Sessions shorter than this are treated as "didn't really happen":
+        // no log, no streak credit, no heatmap cell. Above the threshold we
+        // honor the time spent and route through the natural completion UI.
+        const PARTIAL_LOG_MIN_MS = 30000;
+
+        let confirmOpen = false;
+        let confirmReturnFocus = null;
+        let sessionStartedAt = 0;
+        let backTrapInstalled = false;
+        // True once the user has chosen "End session" — disarms beforeunload
+        // for the immediately-following reload so we don't double-prompt.
+        let confirmedExit = false;
+
+        function formatElapsed(ms) {
+            const sec = Math.max(0, Math.round(ms / 1000));
+            if (sec < 60) return sec + ' second' + (sec === 1 ? '' : 's');
+            const min = Math.floor(sec / 60);
+            const rem = sec % 60;
+            if (rem === 0) return min + ' minute' + (min === 1 ? '' : 's');
+            return min + 'm ' + rem + 's';
+        }
+
+        function openEndConfirm() {
+            if (confirmOpen || !isSessionActive) return;
+            confirmOpen = true;
+            confirmReturnFocus = document.activeElement;
+
+            // One active dialog at a time: drop the audio popover if it's
+            // open so it isn't visually buried beneath this one.
+            if (popoverOpen) closeAudioPopover();
+
+            const elapsed = sessionStartedAt > 0 ? performance.now() - sessionStartedAt : 0;
+            const total = selectedDurationMs;
+            const remaining = Math.max(0, total - elapsed);
+            const willLog = elapsed >= PARTIAL_LOG_MIN_MS;
+            const elapsedMin = Math.max(1, Math.round(elapsed / 60000));
+
+            // Adaptive copy across three tiers. Static text feels cold for
+            // a meditation flow — varying based on progress reads more like
+            // a coach checking in than a system warning.
+            if (!willLog) {
+                endConfirmBodyEl.textContent = 'You just settled in. Stay another moment?';
+            } else if (elapsed > total * 0.9) {
+                endConfirmBodyEl.textContent =
+                    'Almost there — only ' + formatElapsed(remaining) + ' left.';
+            } else {
+                endConfirmBodyEl.textContent =
+                    "You've been breathing for " + formatElapsed(elapsed) + '. Stay a little longer?';
+            }
+
+            // Surface the partial-credit policy directly on the secondary
+            // button. Knowing "End — log 3m" doesn't throw the work
+            // away makes the choice less loaded — and the streak less
+            // brittle.
+            endConfirmEndBtn.textContent = willLog
+                ? ('End — log ' + elapsedMin + 'm')
+                : 'End session';
+
+            const pct = total > 0 ? Math.min(100, (elapsed / total) * 100) : 0;
+            endConfirmProgressFillEl.style.width = pct + '%';
+
+            endConfirmModal.removeAttribute('inert');
+            endConfirmModal.setAttribute('aria-hidden', 'false');
+            endConfirmModal.classList.add('open');
+            // Pause the breathing pulse behind the dialog (see CSS rule
+            // body.confirm-open .animate-breathe). The pulse resumes from
+            // exactly the same frame on Keep breathing.
+            document.body.classList.add('confirm-open');
+
+            // Subtle haptic — barely perceptible but tells touch users the
+            // system caught their action even before the modal scales in.
+            // Wrapped in try/catch because some Android skins throw when
+            // vibrate() is called from a not-fully-focused context.
+            if (navigator.vibrate) {
+                try { navigator.vibrate(15); } catch (e) { }
+            }
+
+            // Defer focus to the next frame: shifting focus mid-transform
+            // can make some screen readers skip the dialog announcement.
+            requestAnimationFrame(() => {
+                try { endConfirmKeepBtn.focus(); } catch (e) { }
+            });
+        }
+
+        function closeEndConfirm(restoreFocus) {
+            if (!confirmOpen) return;
+            confirmOpen = false;
+            endConfirmModal.classList.remove('open');
+            endConfirmModal.setAttribute('aria-hidden', 'true');
+            endConfirmModal.setAttribute('inert', '');
+            // Resume the breathing pulse — it picks up from the same frame
+            // it was paused on, so the cycle stays visually continuous.
+            document.body.classList.remove('confirm-open');
+            if (restoreFocus !== false && confirmReturnFocus &&
+                typeof confirmReturnFocus.focus === 'function') {
+                try { confirmReturnFocus.focus(); } catch (e) { }
+            }
+            confirmReturnFocus = null;
+        }
+
+        function confirmEndAndExit() {
+            closeEndConfirm(false);
+            confirmedExit = true;
+
+            const elapsedMs = sessionStartedAt > 0
+                ? performance.now() - sessionStartedAt
+                : 0;
+
+            if (elapsedMs < PARTIAL_LOG_MIN_MS) {
+                // Below the log threshold: treat as "didn't really happen"
+                // so the streak / heatmap aren't padded with phantom
+                // sub-minute sessions. Hard reload mirrors the post-session
+                // Home button — every transient piece of state resets cleanly.
+                isSessionActive = false;
+                document.body.classList.remove('in-session');
+                stopWakeLockMonitor();
+                releaseWakeLock();
+                location.reload();
+                return;
+            }
+
+            // Honor the time meditated. Reroute through endSession's
+            // completion path so the user sees the same green-check
+            // celebration and streak update as a natural finish — quitting
+            // early should never feel like the work was thrown away.
+            // endSession reads selectedDurationMs to size the log entry,
+            // so we override it with the actual elapsed before calling.
+            selectedDurationMs = elapsedMs;
+            endSession();
+        }
+
+        endSessionBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openEndConfirm();
+        });
+
+        endConfirmKeepBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeEndConfirm();
+        });
+
+        endConfirmEndBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            confirmEndAndExit();
+        });
+
+        // Backdrop tap = "Keep breathing" (the safer default — meditation
+        // sessions deserve the benefit of the doubt on stray taps).
+        endConfirmBackdrop.addEventListener('click', (e) => {
+            if (e.target === endConfirmBackdrop) closeEndConfirm();
+        });
+
+        // Tab-cycle inside the modal so keyboard / switch-control users
+        // can't escape into the now-inert breathing screen behind it.
+        endConfirmModal.addEventListener('keydown', (e) => {
+            if (!confirmOpen || e.key !== 'Tab') return;
+            const first = endConfirmKeepBtn;
+            const last = endConfirmEndBtn;
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        });
+
+        // Global Escape: close the modal if open, otherwise open it from
+        // an active session. defaultPrevented lets the existing keydown
+        // handler claim Escape first when it has its own work (closing
+        // the audio popover, leaving the streak / quotes panels, etc.).
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (confirmOpen) {
+                e.preventDefault();
+                closeEndConfirm();
+                return;
+            }
+            if (e.defaultPrevented) return;
+            if (popoverOpen) return;
+            if (!isSessionActive) return;
+            if (!s34El.classList.contains('active')) return;
+            e.preventDefault();
+            openEndConfirm();
+        });
+
+        // popstate trap: pushing one extra history entry on session start
+        // means the user's first back press / back gesture lands here
+        // instead of leaving the page. We re-push immediately so a second
+        // gesture (while the modal is open) also bounces back into us.
+        function installBackTrap() {
+            if (backTrapInstalled) return;
+            try {
+                history.pushState({ zenSession: true }, '');
+                backTrapInstalled = true;
+            } catch (e) { /* Safari private mode, sandboxed iframes */ }
+        }
+        function uninstallBackTrap() {
+            if (!backTrapInstalled) return;
+            backTrapInstalled = false;
+            // Consume the entry we pushed on session start so a single
+            // back press after natural completion exits the app like any
+            // other page (instead of "wasting" one press on the trapped
+            // entry). popstate fires async; isSessionActive is already
+            // false by the time it lands, so the listener returns early
+            // without re-pushing.
+            try { history.back(); } catch (e) { }
+        }
+        window.addEventListener('popstate', () => {
+            if (!isSessionActive) return;
+            try { history.pushState({ zenSession: true }, ''); } catch (e) { }
+            if (!confirmOpen) openEndConfirm();
+        });
+
+        // Tab close / refresh / nav-away. Modern browsers ignore custom
+        // strings here and show their own generic dialog, but opting in
+        // is what flips that dialog on. Skipped once the user has already
+        // confirmed exit (our own location.reload() shouldn't double-prompt).
+        window.addEventListener('beforeunload', (e) => {
+            if (!isSessionActive || confirmedExit) return;
+            e.preventDefault();
+            // Legacy Chrome / Edge still reads `returnValue`.
+            e.returnValue = '';
+            return '';
+        });
+
+        /* ── Weekly meditation reminders ─────────────────────────────────
+           Three moving parts:
+
+             1. Service worker (./sw.js) — handles the actual notification
+                rendering, click-routing back to the hosted site, and the
+                Periodic Background Sync event where supported.
+
+             2. First-visit prompt — a custom modal that asks the user
+                whether they want reminders before we burn the native
+                permission prompt. If they say "no" we persist the choice
+                and never ask again, per spec.
+
+             3. Periodic Background Sync registration on grant — silently
+                ignored where unsupported (iOS Safari, Firefox, desktop
+                Safari without the experimental flag). On Chromium-based
+                Android with the site installed as a PWA, the OS fires
+                the sync at its own cadence and the worker shows the
+                weekly notification.
+
+           iOS Safari note: until the user installs the site to their
+           Home Screen, Notification.requestPermission() resolves with
+           'denied' immediately (no system UI). We detect this case and
+           replace the prompt with an "Add to Home Screen first" hint
+           so iPhone/iPad users aren't left with a dead-end Yes button. */
+
+        const REMINDER_URL = 'https://leolynbrook.github.io/Meditation-Website/';
+        const NOTIF_PREF_KEY = 'zen_notif_pref';
+        const PBS_TAG = 'weekly-meditation-reminder';
+        const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+        const notifPromptModal = document.getElementById('notifPromptModal');
+        const notifPromptBackdrop = document.getElementById('notifPromptBackdrop');
+        const notifPromptTitleEl = document.getElementById('notifPromptTitle');
+        const notifPromptBodyEl = document.getElementById('notifPromptBody');
+        const notifPromptYesBtn = document.getElementById('notifPromptYes');
+        const notifPromptNoBtn = document.getElementById('notifPromptNo');
+
+        let notifPromptOpen = false;
+        let notifPromptReturnFocus = null;
+        // 'ask' = native permission flow on Yes;  'ios-install' = informational
+        // dialog on iOS Safari (where Notification.requestPermission would
+        // immediately deny). Set by openNotifPrompt before showing.
+        let notifPromptMode = 'ask';
+
+        // Detect iPhone / iPad / iPod. iPadOS 13+ reports as Mac with touch,
+        // hence the maxTouchPoints check.
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const isStandalone = (window.matchMedia &&
+            window.matchMedia('(display-mode: standalone)').matches) ||
+            window.navigator.standalone === true;
+
+        function openNotifPrompt(mode) {
+            if (notifPromptOpen) return;
+            notifPromptMode = mode || 'ask';
+            notifPromptOpen = true;
+            notifPromptReturnFocus = document.activeElement;
+
+            if (notifPromptMode === 'ios-install') {
+                notifPromptTitleEl.textContent = 'Add ZenBreath to your Home Screen';
+                notifPromptBodyEl.textContent =
+                    'Weekly reminders on iPhone and iPad require ZenBreath to be installed. ' +
+                    'Tap the Share button and choose "Add to Home Screen", then open ZenBreath from your Home Screen to enable them.';
+                notifPromptYesBtn.textContent = 'Got it';
+                notifPromptNoBtn.style.display = 'none';
+            } else {
+                notifPromptTitleEl.textContent = 'Weekly reminders?';
+                notifPromptBodyEl.textContent =
+                    'ZenBreath can nudge you once a week to take a few breaths. You can change this any time in your browser settings.';
+                notifPromptYesBtn.textContent = 'Yes, remind me';
+                notifPromptNoBtn.textContent = 'No thanks';
+                notifPromptNoBtn.style.display = '';
+            }
+
+            notifPromptModal.removeAttribute('inert');
+            notifPromptModal.setAttribute('aria-hidden', 'false');
+            notifPromptModal.classList.add('open');
+            document.body.classList.add('confirm-open');
+            requestAnimationFrame(() => {
+                try { notifPromptYesBtn.focus(); } catch (e) { }
+            });
+        }
+
+        function closeNotifPrompt() {
+            if (!notifPromptOpen) return;
+            notifPromptOpen = false;
+            notifPromptModal.classList.remove('open');
+            notifPromptModal.setAttribute('aria-hidden', 'true');
+            notifPromptModal.setAttribute('inert', '');
+            document.body.classList.remove('confirm-open');
+            if (notifPromptReturnFocus && typeof notifPromptReturnFocus.focus === 'function') {
+                try { notifPromptReturnFocus.focus(); } catch (e) { }
+            }
+            notifPromptReturnFocus = null;
+        }
+
+        async function requestPermissionCompat() {
+            // Older Safari only had the callback form; modern browsers
+            // return a Promise. Probe and fall back so we work everywhere.
+            try {
+                const result = Notification.requestPermission();
+                if (result && typeof result.then === 'function') return await result;
+            } catch (e) { }
+            return await new Promise((resolve) => {
+                try { Notification.requestPermission(resolve); }
+                catch (e) { resolve('denied'); }
+            });
+        }
+
+        async function registerPeriodicSync() {
+            if (!('serviceWorker' in navigator)) return;
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                if (!('periodicSync' in reg)) return;
+                // Permission gate: periodic-background-sync is a separate
+                // permission from notifications. On unsupported browsers
+                // (Safari, Firefox) the query itself throws — try/catch covers it.
+                let pbsState = 'granted';
+                try {
+                    const status = await navigator.permissions.query({
+                        name: 'periodic-background-sync'
+                    });
+                    pbsState = status.state;
+                } catch (e) { /* permission name unknown → assume granted */ }
+                if (pbsState !== 'granted') return;
+                await reg.periodicSync.register(PBS_TAG, {
+                    minInterval: WEEK_MS
+                });
+            } catch (e) {
+                // Site not installed as a PWA, no engagement score, or
+                // browser doesn't support PBS. Silent failure is correct
+                // here — the user already granted permission, we just
+                // can't background-deliver on this platform.
+            }
+        }
+
+        async function enableNotifications() {
+            if (!('Notification' in window)) {
+                storageSet(NOTIF_PREF_KEY, 'no');
+                return;
+            }
+            const perm = await requestPermissionCompat();
+            if (perm !== 'granted') {
+                // User denied at the system level (or browser silently
+                // denied because we're an unsupported context — e.g.
+                // iOS Safari outside a PWA install). Persist so we don't
+                // re-ask each visit.
+                storageSet(NOTIF_PREF_KEY, isIOS && !isStandalone ? 'no-ios' : 'no');
+                return;
+            }
+            storageSet(NOTIF_PREF_KEY, 'yes');
+            await registerPeriodicSync();
+        }
+
+        notifPromptYesBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const mode = notifPromptMode;
+            closeNotifPrompt();
+            if (mode === 'ios-install') {
+                // Informational dialog only — persist 'no-ios' so we don't
+                // re-prompt in Safari, but leave the door open: once the
+                // user opens ZenBreath from their Home Screen (standalone
+                // mode), maybeAskForNotifications resets this and asks fresh.
+                storageSet(NOTIF_PREF_KEY, 'no-ios');
+                return;
+            }
+            await enableNotifications();
+        });
+
+        notifPromptNoBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            storageSet(NOTIF_PREF_KEY, 'no');
+            closeNotifPrompt();
+        });
+
+        notifPromptBackdrop.addEventListener('click', (e) => {
+            if (e.target !== notifPromptBackdrop) return;
+            // Backdrop tap = the safe default. We DON'T persist 'no' here
+            // because dismissal-by-tap-outside isn't a clear answer; we'll
+            // try again on the next visit.
+            closeNotifPrompt();
+        });
+
+        notifPromptModal.addEventListener('keydown', (e) => {
+            if (!notifPromptOpen) return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                closeNotifPrompt();
+                return;
+            }
+            if (e.key === 'Tab') {
+                const focusables = [notifPromptYesBtn, notifPromptNoBtn]
+                    .filter((b) => b.offsetParent !== null); // skip hidden buttons
+                if (focusables.length < 2) return;
+                const first = focusables[0];
+                const last = focusables[focusables.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+        });
+
+        async function registerNotifSW() {
+            if (!('serviceWorker' in navigator)) return;
+            // Don't register on insecure origins — registration would throw
+            // and the catch below masks legit errors during development.
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost' &&
+                location.hostname !== '127.0.0.1') return;
+            try {
+                await navigator.serviceWorker.register('./sw.js');
+            } catch (e) {
+                // Common cause: file:// origins, sandboxed iframes, or
+                // missing sw.js. Notifications won't work in those cases
+                // anyway, so failing silently is the right move.
+            }
+        }
+
+        async function maybeAskForNotifications() {
+            // No notification API at all → don't bother prompting. The
+            // exception is iOS Safari pre-16.4 where Notification doesn't
+            // exist in the global; the install hint is still useful there
+            // so the user knows there's a path to enabling reminders.
+            const hasNotificationAPI = 'Notification' in window;
+            if (!hasNotificationAPI && !(isIOS && !isStandalone)) return;
+
+            let pref = storageGet(NOTIF_PREF_KEY, '');
+
+            // If the user previously saw the iOS install hint and has since
+            // moved into standalone mode, treat them as fresh: they're now
+            // in the install state that supports notifications.
+            if (pref === 'no-ios' && isStandalone) {
+                storageSet(NOTIF_PREF_KEY, '');
+                pref = '';
+            }
+
+            if (pref === 'yes') {
+                // Permission can be revoked outside our flow (browser
+                // settings, OS focus mode). Refresh periodic sync only
+                // when the browser still reports granted.
+                if (hasNotificationAPI && Notification.permission === 'granted') {
+                    await registerPeriodicSync();
+                    // Best-effort catch-up: ask the SW to render a reminder
+                    // if more than a week has passed since the last one,
+                    // covering platforms where PBS doesn't fire reliably.
+                    try {
+                        const reg = await navigator.serviceWorker.ready;
+                        if (reg.active) {
+                            reg.active.postMessage({ type: 'show-weekly-reminder' });
+                        }
+                    } catch (e) { }
+                } else if (hasNotificationAPI && Notification.permission === 'denied') {
+                    // User revoked at the OS level. Drop our 'yes' so we
+                    // don't keep trying to register PBS.
+                    storageSet(NOTIF_PREF_KEY, 'no');
+                }
+                return;
+            }
+            if (pref === 'no' || pref === 'no-ios') return;
+
+            // Fresh visit. Defer briefly so the meditation UI gets to
+            // render and feel like an app first — pre-prompts shown before
+            // any context burn the grant rate. We also gate on s1
+            // (the home screen) so the prompt can never interrupt a
+            // breathing session already in progress: if the user already
+            // tapped Begin, we'll catch them on the next page reload
+            // (resetToHome's location.reload re-enters this flow).
+            setTimeout(() => {
+                if (notifPromptOpen) return;
+                if (!s1El.classList.contains('active')) return;
+                if (isIOS && !isStandalone) {
+                    openNotifPrompt('ios-install');
+                } else {
+                    openNotifPrompt('ask');
+                }
+            }, 2500);
+        }
+
+        registerNotifSW();
+        maybeAskForNotifications();
 
         // Initialize streak button count on load
         updateStreakBtn();
