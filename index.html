@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -16,6 +17,103 @@
          and break the meditative aesthetic. -->
     <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
     <title>ZenBreath</title>
+    <!-- Inline icon for the browser tab and install dialog. Kept as a data URL
+         so the site stays a single HTML file. -->
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20512%20512'%3E%3Crect%20width='512'%20height='512'%20fill='%23000'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='200'%20fill='none'%20stroke='%23fff'%20stroke-width='6'%20opacity='0.25'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='140'%20fill='none'%20stroke='%23fff'%20stroke-width='6'%20opacity='0.45'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='80'%20fill='none'%20stroke='%23fff'%20stroke-width='6'%20opacity='0.7'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='30'%20fill='%23fff'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon"
+        href="data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20512%20512'%3E%3Crect%20width='512'%20height='512'%20fill='%23000'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='200'%20fill='none'%20stroke='%23fff'%20stroke-width='6'%20opacity='0.25'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='140'%20fill='none'%20stroke='%23fff'%20stroke-width='6'%20opacity='0.45'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='80'%20fill='none'%20stroke='%23fff'%20stroke-width='6'%20opacity='0.7'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='30'%20fill='%23fff'/%3E%3C/svg%3E">
+    <!-- Web App Manifest. Built at runtime as a Blob URL so we can keep the
+         site as a single HTML file (no separate manifest.json on the repo)
+         while still satisfying the install-prompt criteria on Chrome/Edge
+         desktop and Android. The companion service worker (./sw.js) is
+         already registered further down. -->
+    <link rel="manifest" id="zb-manifest">
+    <script>
+        (function () {
+            var ICON_SVG = "data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20512%20512'%3E%3Crect%20width='512'%20height='512'%20fill='%23000'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='200'%20fill='none'%20stroke='%23fff'%20stroke-width='6'%20opacity='0.25'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='140'%20fill='none'%20stroke='%23fff'%20stroke-width='6'%20opacity='0.45'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='80'%20fill='none'%20stroke='%23fff'%20stroke-width='6'%20opacity='0.7'/%3E%3Ccircle%20cx='256'%20cy='256'%20r='30'%20fill='%23fff'/%3E%3C/svg%3E";
+
+            // Rasterize the inline SVG onto a canvas to produce a PNG data
+            // URL at a given size. Some browsers (older Chromium, certain
+            // app-store install validators) want PNG icons explicitly, so
+            // we ship both SVG and PNG entries.
+            function rasterize(size) {
+                return new Promise(function (resolve) {
+                    try {
+                        var img = new Image();
+                        img.onload = function () {
+                            try {
+                                var c = document.createElement('canvas');
+                                c.width = size; c.height = size;
+                                var ctx = c.getContext('2d');
+                                // Fill the background explicitly — Safari
+                                // sometimes drops the SVG's own <rect> when
+                                // rasterizing through Image().
+                                ctx.fillStyle = '#000000';
+                                ctx.fillRect(0, 0, size, size);
+                                ctx.drawImage(img, 0, 0, size, size);
+                                resolve(c.toDataURL('image/png'));
+                            } catch (e) { resolve(null); }
+                        };
+                        img.onerror = function () { resolve(null); };
+                        img.src = ICON_SVG;
+                    } catch (e) { resolve(null); }
+                });
+            }
+
+            function setManifest(pngs) {
+                try {
+                    // Absolute start_url / scope / id — the manifest itself
+                    // is served from a blob: URL, so relative paths have
+                    // no useful base to resolve against.
+                    var base = new URL('.', location.href).href;
+                    var icons = [
+                        { src: ICON_SVG, sizes: '192x192', type: 'image/svg+xml', purpose: 'any' },
+                        { src: ICON_SVG, sizes: '512x512', type: 'image/svg+xml', purpose: 'any' },
+                        { src: ICON_SVG, sizes: '192x192 512x512', type: 'image/svg+xml', purpose: 'maskable' }
+                    ];
+                    if (pngs && pngs.p192) {
+                        icons.push({ src: pngs.p192, sizes: '192x192', type: 'image/png', purpose: 'any' });
+                        icons.push({ src: pngs.p192, sizes: '192x192', type: 'image/png', purpose: 'maskable' });
+                    }
+                    if (pngs && pngs.p512) {
+                        icons.push({ src: pngs.p512, sizes: '512x512', type: 'image/png', purpose: 'any' });
+                        icons.push({ src: pngs.p512, sizes: '512x512', type: 'image/png', purpose: 'maskable' });
+                    }
+                    var manifest = {
+                        name: 'ZenBreath',
+                        short_name: 'ZenBreath',
+                        description: 'A minimal meditation and breathing companion.',
+                        start_url: base,
+                        scope: base,
+                        id: base,
+                        display: 'standalone',
+                        display_override: ['standalone', 'minimal-ui'],
+                        orientation: 'portrait',
+                        background_color: '#000000',
+                        theme_color: '#000000',
+                        icons: icons
+                    };
+                    var blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+                    var link = document.getElementById('zb-manifest');
+                    if (link) link.href = URL.createObjectURL(blob);
+                } catch (e) { /* manifest is best-effort */ }
+            }
+
+            // Publish an SVG-only manifest immediately so the link tag has a
+            // valid href the moment the browser asks for it, then swap in
+            // the richer SVG+PNG manifest once the canvas rasterization
+            // resolves.
+            setManifest(null);
+            Promise.all([rasterize(192), rasterize(512)]).then(function (out) {
+                setManifest({ p192: out[0], p512: out[1] });
+            });
+        })();
+    </script>
+    <!-- Nunito — soft, rounded sans-serif for a highly relaxing and friendly feel -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500&family=Cardo:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #000000;
@@ -34,9 +132,22 @@
             --dur-fast: 0.15s;
             --dur-base: 0.25s;
             --dur-slow: 0.45s;
-            --ease-fluid: cubic-bezier(0.4, 0, 0.2, 1);   /* Material standard */
+            --ease-fluid: cubic-bezier(0.4, 0, 0.2, 1);
+            /* Material standard */
             --ease-out-soft: cubic-bezier(0.25, 0.1, 0.25, 1);
-            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* gentle overshoot */
+            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+            /* gentle overshoot */
+
+            /* Glassmorphism tokens — kept intentionally subtle */
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.09);
+            --glass-blur: 14px;
+            /* Slightly stronger frosted look for sheets / panels that sit
+               above other content (popovers, modals, the streak hero card).
+               Larger blur, marginally more translucent. */
+            --glass-bg-strong: rgba(255, 255, 255, 0.07);
+            --glass-border-strong: rgba(255, 255, 255, 0.12);
+            --glass-blur-strong: 22px;
         }
 
         * {
@@ -52,7 +163,8 @@
                then 100dvh on engines that understand it (modern Safari, Chrome, Edge) */
             height: 100vh;
             height: 100dvh;
-            min-height: -webkit-fill-available; /* iOS Safari belt-and-suspenders */
+            min-height: -webkit-fill-available;
+            /* iOS Safari belt-and-suspenders */
             background-color: var(--bg);
             color: var(--fg);
             /* System font stack covers macOS / iOS / Windows / Chromebook / Android */
@@ -75,6 +187,30 @@
             touch-action: manipulation;
             /* Avoid Android pull-to-refresh on the body itself */
             overscroll-behavior: none;
+        }
+
+        /* ---- Noise / grain overlay ----
+           A full-viewport pseudo-element with an inline SVG turbulence filter.
+           Stays fixed above the background but below all content (z-index: 0).
+           Opacity is kept low so it reads as a matte texture, not static.
+           The feColorMatrix step converts the default greyscale turbulence
+           into bright white speckles so a small opacity goes a long way
+           against the pure-black background. */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.045;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.65 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-repeat: repeat;
+        }
+
+        /* Ensure all real content sits above the noise layer */
+        body > * {
+            position: relative;
+            z-index: 1;
         }
 
         /* Removes the 300ms tap delay on touch devices and disables long-press selection
@@ -120,12 +256,15 @@
             justify-content: center;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateY(8px);
         }
 
         .screen.active {
             opacity: 1;
             pointer-events: all;
+            transform: translateY(0);
         }
 
         h1 {
@@ -416,8 +555,10 @@
             top: max(env(safe-area-inset-top, 12px), 12px);
             left: 16px;
             z-index: 100;
-            background: rgba(0, 0, 0, 0);
-            border: 1px solid var(--hairline);
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+            -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+            border: 1px solid var(--glass-border);
             border-radius: 2rem;
             padding: 0.5rem 1rem;
             color: rgba(255, 255, 255, 0.7);
@@ -427,7 +568,9 @@
             cursor: pointer;
             display: flex;
             align-items: center;
-            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.06),
+                0 0 0 0 rgba(255, 255, 255, 0);
             transition:
                 background-color var(--dur-base) var(--ease-fluid),
                 color var(--dur-base) var(--ease-fluid),
@@ -476,16 +619,82 @@
             flex-direction: column;
             gap: 1.4rem;
             padding: 2vh 0 6vh;
+            /* Direction of the exit/entry slide is set by JS via the
+               --qfeed-dir CSS var: +1 = the new tab is to the right of
+               the old one (content slides left on exit, in from right on
+               entry); -1 = the opposite. The 28px throw is enough to feel
+               like deliberate motion without making the panel scroll. */
+            --qfeed-dir: 1;
+            opacity: 1;
+            transform: translateX(0);
+            filter: blur(0);
+            transition:
+                opacity 0.32s var(--ease-fluid),
+                transform 0.42s cubic-bezier(0.4, 0, 0.2, 1),
+                filter 0.32s var(--ease-fluid);
+        }
+
+        /* Exit state — feed slides off in the direction opposite to
+           where the new tab lives, fades to 0, and picks up a tiny blur
+           so the swap reads as a focal shift, not a hard cut. */
+        .quotes-feed.is-leaving {
+            opacity: 0;
+            transform: translateX(calc(-28px * var(--qfeed-dir)));
+            filter: blur(4px);
+            transition:
+                opacity 0.28s var(--ease-fluid),
+                transform 0.32s cubic-bezier(0.55, 0, 0.7, 0.2),
+                filter 0.28s var(--ease-fluid);
+        }
+
+        /* Pre-entry — content is rendered but parked off-axis on the far
+           side, blurred and faded. JS removes this class on the next frame
+           and the regular transition glides it into place. */
+        .quotes-feed.is-entering {
+            opacity: 0;
+            transform: translateX(calc(28px * var(--qfeed-dir)));
+            filter: blur(4px);
+            transition: none;
+        }
+
+        /* Per-item entrance: a touch of slide on top of the existing fade
+           so the items don't look static against the sliding container.
+           The base .quotes-feed-item still controls opacity; we layer the
+           x-axis nudge via the same dir variable for visual coherence. */
+        .quotes-feed.is-switched .quotes-feed-item {
+            animation: quoteSwitchFadeIn 0.55s var(--ease-spring) both;
+        }
+
+        @keyframes quoteSwitchFadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(calc(14px * var(--qfeed-dir)));
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
 
         .quotes-feed-item {
-            font-size: clamp(1rem, 3.5vw, 1.2rem);
-            font-weight: 300;
-            font-style: italic;
-            color: rgba(255, 255, 255, 0.75);
-            line-height: 1.65;
+            position: relative;
+            /* Cardo — a calm, well-balanced book serif. Sets the quotes
+               feed apart from the UI chrome (sans-serif Nunito) and reads
+               cleanly at body sizes without the wispy strokes that some
+               display serifs collapse into on low-DPI screens. */
+            font-family: 'Cardo', 'Georgia', 'Times New Roman', serif;
+            font-size: clamp(1.2rem, 4.2vw, 1.5rem);
+            font-weight: 400;
+            font-style: normal;
+            color: rgba(255, 255, 255, 0.94);
+            line-height: 1.6;
+            letter-spacing: 0.01em;
             text-align: center;
-            padding: 1rem 0.5rem;
+            /* Right padding leaves room for the heart so long quotes never
+               flow under the button — center alignment still feels balanced
+               because the matching left padding mirrors it. */
+            padding: 1.4rem 2.6rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.06);
             opacity: 0;
             /* Opacity-only fade-in: no transform → no compositor layer promotion,
@@ -495,6 +704,286 @@
 
         .quotes-feed-item:last-child {
             border-bottom: none;
+        }
+
+        /* Heart / favorite button. Sits in the top-right of each quote so
+           the gesture is the same regardless of quote length. The button
+           is large enough (44px target) to satisfy mobile tap-size guidance
+           without crowding shorter quotes. */
+        .quote-heart {
+            position: absolute;
+            top: 0.6rem;
+            right: 0.4rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 0;
+            border-radius: 999px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            color: rgba(255, 255, 255, 0.42);
+            font-size: 1.2rem;
+            line-height: 1;
+            transition:
+                color var(--dur-base) var(--ease-fluid),
+                background-color var(--dur-base) var(--ease-fluid),
+                transform var(--dur-fast) var(--ease-fluid);
+        }
+
+        /* Custom hover tooltip ("Favorite" / "Unfavorite"). We render our
+           own bubble instead of relying on the native `title` attribute
+           because the browser tooltip is slow (~1s delay), styled by the
+           OS, and never appears on touch. The `data-tooltip` attribute
+           drives the label so JS can swap "Favorite" ↔ "Unfavorite"
+           without touching the button's own text. Native `title` is still
+           applied as a fallback for AT users and long-press on touch. */
+        .quote-heart::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            top: 100%;
+            right: 50%;
+            transform: translate(50%, 4px) scale(0.92);
+            margin-top: 6px;
+            padding: 0.32rem 0.6rem;
+            background: rgba(20, 20, 20, 0.85);
+            backdrop-filter: blur(10px) saturate(140%);
+            -webkit-backdrop-filter: blur(10px) saturate(140%);
+            color: rgba(255, 255, 255, 0.92);
+            border: 1px solid var(--glass-border-strong);
+            border-radius: 0.5rem;
+            font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+            transition:
+                opacity 0.18s var(--ease-fluid),
+                transform 0.22s var(--ease-spring);
+        }
+
+        /* Only show the tooltip on real pointers — touch users see the
+           visual heart state change immediately, which is clearer than a
+           floating bubble they'd have to tap to dismiss. */
+        @media (hover: hover) and (pointer: fine) {
+            .quote-heart:hover::after,
+            .quote-heart:focus-visible::after {
+                opacity: 1;
+                transform: translate(50%, 0) scale(1);
+            }
+        }
+
+        .quote-heart svg {
+            width: 22px;
+            height: 22px;
+            display: block;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition:
+                fill var(--dur-base) var(--ease-fluid),
+                stroke var(--dur-base) var(--ease-fluid),
+                transform 0.32s var(--ease-spring);
+        }
+
+        .quote-heart.saved {
+            color: #ff5a7a;
+        }
+
+        .quote-heart.saved svg {
+            fill: #ff5a7a;
+            stroke: #ff5a7a;
+            transform: scale(1.08);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .quote-heart:hover {
+                color: #ff8aa3;
+                background: rgba(255, 90, 122, 0.08);
+            }
+        }
+
+        .quote-heart:active {
+            transform: scale(0.86);
+        }
+
+        .quote-heart:focus-visible {
+            outline: 2px solid var(--success-soft);
+            outline-offset: 2px;
+        }
+
+        /* Tab bar at the top of the Quotes screen to swap between the
+           random feed and saved favorites. Pill style mirrors the rest of
+           the app's chips so it feels native rather than bolted on. */
+        .quotes-tabs {
+            position: relative;
+            display: inline-flex;
+            align-self: center;
+            gap: 4px;
+            margin: 0.4rem auto 0.6rem;
+            padding: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--hairline);
+            border-radius: 999px;
+            backdrop-filter: blur(14px) saturate(150%);
+            -webkit-backdrop-filter: blur(14px) saturate(150%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        /* Sliding pill that visually owns the "active" tab. We measure
+           the chosen button in JS and write its width + offset into CSS
+           vars on the parent; the indicator transitions to that position
+           with a spring easing, so switching tabs feels like a single
+           continuous gesture instead of two independent recolorings. */
+        .quotes-tabs-indicator {
+            position: absolute;
+            top: 4px;
+            left: 0;
+            height: calc(100% - 8px);
+            width: var(--qtabs-w, 0px);
+            transform: translateX(var(--qtabs-x, 0px));
+            background: rgba(255, 255, 255, 0.14);
+            border-radius: 999px;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.12),
+                0 4px 12px rgba(0, 0, 0, 0.25);
+            pointer-events: none;
+            opacity: 0;
+            transition:
+                transform 0.5s var(--ease-spring),
+                width 0.5s var(--ease-spring),
+                opacity 0.25s var(--ease-fluid);
+        }
+
+        .quotes-tabs-indicator.ready {
+            opacity: 1;
+        }
+
+        .quotes-tab {
+            position: relative;
+            z-index: 1;
+            appearance: none;
+            border: 0;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.55);
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            padding: 0.5rem 1rem;
+            border-radius: 999px;
+            cursor: pointer;
+            min-height: 36px;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            /* Color is the only thing the tab itself transitions — the
+               indicator slide handles the background, and giving both rules
+               a background would double-render the active state during the
+               crossover. */
+            transition: color var(--dur-base) var(--ease-fluid);
+        }
+
+        .quotes-tab.active {
+            color: #fff;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .quotes-tab:hover:not(.active) {
+                color: rgba(255, 255, 255, 0.85);
+            }
+        }
+
+        .quotes-tab:active {
+            transform: scale(0.97);
+            transition-duration: var(--dur-fast);
+        }
+
+        /* Touch-first ergonomics. Anything without a precise pointer is
+           treated as a finger — covers all phones, every iPad (yes, even
+           with a paired keyboard, since hover stays "none"), and Chromebook
+           touch mode. We bump tap targets and ease blur cost in one go. */
+        @media (hover: none), (pointer: coarse) {
+            /* Heart sits a touch farther in on touch, so feed items need a
+               touch more right padding to keep long quotes from kissing the
+               button. */
+            .quotes-feed-item {
+                padding-right: 3.1rem;
+                padding-left: 1.4rem;
+            }
+
+            .quotes-tabs {
+                margin: 0.5rem auto 0.8rem;
+                padding: 5px;
+            }
+
+            .quotes-tab {
+                /* 44px is the Apple HIG floor, 48dp the Material floor —
+                   46px clears both with a touch of breathing room. */
+                min-height: 46px;
+                padding: 0.65rem 1.25rem;
+                font-size: 0.92rem;
+            }
+
+            .quote-heart {
+                width: 46px;
+                height: 46px;
+                top: 0.35rem;
+                right: 0.2rem;
+            }
+
+            .quote-heart svg {
+                width: 24px;
+                height: 24px;
+            }
+
+            /* The native browser tooltip on long-press is the right primary
+               affordance for touch, so the hover bubble is already hidden by
+               the (hover: hover) gate — nothing extra needed here. */
+        }
+
+        /* Subtle entrance fade for the Streak & Quotes panels. The base
+           .screen transition already fades + lifts, but because these
+           panels sit on top with an opaque background it lands too quickly.
+           A short, gentle inner fade on the content gives the panel a clear
+           "arrival" beat without feeling slow or theatrical. */
+        @keyframes panelFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .streak-screen.active > *:not(.streak-back),
+        .quotes-screen.active > *:not(.streak-back) {
+            animation: panelFadeIn 0.45s var(--ease-fluid) both;
+        }
+
+        .quotes-empty {
+            grid-column: 1 / -1;
+            margin: 4vh auto 0;
+            max-width: 420px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.55);
+            font-family: inherit;
+            font-size: 0.95rem;
+            line-height: 1.55;
+            padding: 1.2rem;
+            border: 1px dashed var(--hairline);
+            border-radius: 1rem;
+            background: rgba(255, 255, 255, 0.02);
         }
 
         @keyframes quoteFadeIn {
@@ -509,8 +998,10 @@
             top: max(env(safe-area-inset-top, 12px), 12px);
             right: 16px;
             z-index: 100;
-            background: rgba(0, 0, 0, 0);
-            border: 1px solid var(--hairline);
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+            -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+            border: 1px solid var(--glass-border);
             border-radius: 2rem;
             padding: 0.5rem 1rem;
             color: rgba(255, 255, 255, 0.7);
@@ -521,7 +1012,9 @@
             display: flex;
             align-items: center;
             gap: 0.4rem;
-            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.06),
+                0 0 0 0 rgba(255, 255, 255, 0);
             transition:
                 background-color var(--dur-base) var(--ease-fluid),
                 color var(--dur-base) var(--ease-fluid),
@@ -570,8 +1063,10 @@
             position: absolute;
             top: max(env(safe-area-inset-top, 12px), 12px);
             left: 16px;
-            background: rgba(0, 0, 0, 0);
-            border: 1px solid var(--hairline);
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+            -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+            border: 1px solid var(--glass-border);
             border-radius: 2rem;
             padding: 0.5rem 1rem;
             color: rgba(255, 255, 255, 0.7);
@@ -579,7 +1074,9 @@
             font-weight: 500;
             cursor: pointer;
             z-index: 10;
-            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.06),
+                0 0 0 0 rgba(255, 255, 255, 0);
             transition:
                 background-color var(--dur-base) var(--ease-fluid),
                 color var(--dur-base) var(--ease-fluid),
@@ -661,12 +1158,15 @@
             text-align: center;
             transition: color 0.4s ease, opacity 0.4s ease;
         }
+
         .streak-milestone.best {
             color: rgba(255, 215, 102, 0.92);
         }
+
         .streak-milestone.empty {
             color: rgba(255, 255, 255, 0.42);
         }
+
         .streak-milestone .accent {
             color: var(--success);
             font-weight: 500;
@@ -684,15 +1184,22 @@
         }
 
         .stat-card {
-            background: var(--surface-1);
-            border: 1px solid var(--surface-2);
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+            -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+            border: 1px solid var(--glass-border);
             border-radius: 0.85rem;
             padding: 0.85rem 0.5rem 0.7rem;
             text-align: center;
             /* Allow grid item to shrink below content width on small phones */
             min-width: 0;
             overflow: hidden;
-            box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+            /* Soft inset highlight on the top edge mimics how light catches
+               a real frosted surface. Pairs with the saturate filter above
+               to give the card depth without inflating contrast. */
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.07),
+                0 0 0 0 rgba(0, 0, 0, 0);
             transition:
                 background-color var(--dur-base) var(--ease-fluid),
                 border-color var(--dur-base) var(--ease-fluid),
@@ -716,9 +1223,11 @@
             margin: 0 auto 0.3rem;
             display: block;
         }
+
         .stat-card.empty .stat-icon {
             color: rgba(255, 255, 255, 0.18);
         }
+
         .stat-card.empty .stat-value {
             color: rgba(255, 255, 255, 0.3);
         }
@@ -861,9 +1370,9 @@
             /* Edge fade hints that there's more to scroll. Mask is purely visual; cells under
                the fade remain interactable. Mask both sides since we auto-scroll to today. */
             -webkit-mask-image: linear-gradient(to right,
-                transparent 0%, black 16px, black calc(100% - 16px), transparent 100%);
+                    transparent 0%, black 16px, black calc(100% - 16px), transparent 100%);
             mask-image: linear-gradient(to right,
-                transparent 0%, black 16px, black calc(100% - 16px), transparent 100%);
+                    transparent 0%, black 16px, black calc(100% - 16px), transparent 100%);
         }
 
         .heatmap-scroll::-webkit-scrollbar {
@@ -949,10 +1458,21 @@
             background: transparent;
         }
 
-        .heatmap-cell.l1 { background: #1c4a1e; }
-        .heatmap-cell.l2 { background: #2d7d31; }
-        .heatmap-cell.l3 { background: #4daf50; }
-        .heatmap-cell.l4 { background: #81C784; }
+        .heatmap-cell.l1 {
+            background: #1c4a1e;
+        }
+
+        .heatmap-cell.l2 {
+            background: #2d7d31;
+        }
+
+        .heatmap-cell.l3 {
+            background: #4daf50;
+        }
+
+        .heatmap-cell.l4 {
+            background: #81C784;
+        }
 
         .heatmap-cell.today {
             outline: 1px solid rgba(255, 255, 255, 0.6);
@@ -1016,10 +1536,14 @@
                hover/active transforms below via CSS var so they don't conflict. */
             --drag-x: 0px;
             transform: translateX(var(--drag-x));
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--hairline);
+            /* Frosted glass pill — more translucent than before so the
+               saturate filter has something to lift, with a soft inset
+               highlight that mimics the catch on a real frosted surface. */
+            background: rgba(0, 0, 0, 0.28);
+            backdrop-filter: blur(18px) saturate(150%);
+            -webkit-backdrop-filter: blur(18px) saturate(150%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--glass-border-strong);
             border-radius: 2rem;
             padding: 0.5rem 0.9rem;
             color: rgba(255, 255, 255, 0.7);
@@ -1139,8 +1663,8 @@
             position: absolute;
             inset: 0;
             background: linear-gradient(to right,
-                rgba(244, 67, 54, 0.32) 0%,
-                rgba(244, 67, 54, 0.08) 100%);
+                    rgba(244, 67, 54, 0.32) 0%,
+                    rgba(244, 67, 54, 0.08) 100%);
             transform: scaleX(var(--mute-progress, 0));
             transform-origin: 0% 50%;
             transition: transform 0.06s linear, opacity 0.18s var(--ease-fluid);
@@ -1167,7 +1691,7 @@
         /* The label is anchored to the left, but the dragging button will cover
            the right portion of the rail. Fade the label out as drag progresses
            so the overlap reads as the button "consuming" the rail toward mute. */
-        .audio-mute-track-content > span {
+        .audio-mute-track-content>span {
             transition: opacity 0.12s var(--ease-fluid);
             opacity: calc(1 - var(--mute-progress, 0) * 1.4);
             white-space: nowrap;
@@ -1215,8 +1739,15 @@
         }
 
         @keyframes muteArrowNudge {
-            0%, 100% { transform: translateY(-50%) translateX(0); }
-            50% { transform: translateY(-50%) translateX(-4px); }
+
+            0%,
+            100% {
+                transform: translateY(-50%) translateX(0);
+            }
+
+            50% {
+                transform: translateY(-50%) translateX(-4px);
+            }
         }
 
         .audio-popover {
@@ -1224,10 +1755,12 @@
             bottom: calc(max(env(safe-area-inset-bottom, 18px), 18px) + 50px);
             left: 50%;
             z-index: 251;
-            background: rgba(15, 15, 15, 0.92);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            /* More translucent so the noise + background show through —
+               the frosted look reads as glass instead of dark sheet. */
+            background: rgba(15, 15, 15, 0.72);
+            backdrop-filter: blur(24px) saturate(140%);
+            -webkit-backdrop-filter: blur(24px) saturate(140%);
+            border: 1px solid var(--glass-border-strong);
             border-radius: 1rem;
             padding: 0.7rem 0.7rem 0.65rem;
             display: flex;
@@ -1267,6 +1800,7 @@
                 opacity: 0;
                 transform: translateY(8px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -1281,14 +1815,37 @@
             animation: popoverItemReveal 0.32s var(--ease-spring) backwards;
         }
 
-        .audio-popover.open .audio-chip:nth-child(1) { animation-delay: 0.10s; }
-        .audio-popover.open .audio-chip:nth-child(2) { animation-delay: 0.13s; }
-        .audio-popover.open .audio-chip:nth-child(3) { animation-delay: 0.16s; }
-        .audio-popover.open .audio-chip:nth-child(4) { animation-delay: 0.19s; }
-        .audio-popover.open .audio-chip:nth-child(5) { animation-delay: 0.22s; }
-        .audio-popover.open .audio-chip:nth-child(6) { animation-delay: 0.25s; }
-        .audio-popover.open .audio-chip:nth-child(7) { animation-delay: 0.28s; }
-        .audio-popover.open .audio-chip:nth-child(8) { animation-delay: 0.31s; }
+        .audio-popover.open .audio-chip:nth-child(1) {
+            animation-delay: 0.10s;
+        }
+
+        .audio-popover.open .audio-chip:nth-child(2) {
+            animation-delay: 0.13s;
+        }
+
+        .audio-popover.open .audio-chip:nth-child(3) {
+            animation-delay: 0.16s;
+        }
+
+        .audio-popover.open .audio-chip:nth-child(4) {
+            animation-delay: 0.19s;
+        }
+
+        .audio-popover.open .audio-chip:nth-child(5) {
+            animation-delay: 0.22s;
+        }
+
+        .audio-popover.open .audio-chip:nth-child(6) {
+            animation-delay: 0.25s;
+        }
+
+        .audio-popover.open .audio-chip:nth-child(7) {
+            animation-delay: 0.28s;
+        }
+
+        .audio-popover.open .audio-chip:nth-child(8) {
+            animation-delay: 0.31s;
+        }
 
         .audio-chips {
             display: flex;
@@ -1324,15 +1881,19 @@
         .audio-volume-icon .audio-volume-mute {
             transition: opacity 0.18s var(--ease-fluid);
         }
+
         .audio-volume-icon .audio-volume-mute {
             opacity: 0;
         }
+
         .audio-volume-icon.muted .audio-volume-wave {
             opacity: 0;
         }
+
         .audio-volume-icon.muted .audio-volume-mute {
             opacity: 1;
         }
+
         /* When fully muted the icon goes a touch warmer / dimmer so the
            "this is silent" state is communicated by colour as well as glyph. */
         .audio-volume-icon.muted {
@@ -1343,7 +1904,8 @@
             -webkit-appearance: none;
             appearance: none;
             flex: 1;
-            height: 22px; /* tap area */
+            height: 22px;
+            /* tap area */
             background: transparent;
             cursor: pointer;
             outline: none;
@@ -1353,10 +1915,10 @@
         .audio-slider::-webkit-slider-runnable-track {
             height: 3px;
             background: linear-gradient(to right,
-                rgba(129, 199, 132, 0.7) 0%,
-                rgba(129, 199, 132, 0.7) var(--vol-pct, 50%),
-                rgba(255, 255, 255, 0.12) var(--vol-pct, 50%),
-                rgba(255, 255, 255, 0.12) 100%);
+                    rgba(129, 199, 132, 0.7) 0%,
+                    rgba(129, 199, 132, 0.7) var(--vol-pct, 50%),
+                    rgba(255, 255, 255, 0.12) var(--vol-pct, 50%),
+                    rgba(255, 255, 255, 0.12) 100%);
             border-radius: 2px;
         }
 
@@ -1433,11 +1995,24 @@
             .audio-btn {
                 background: rgba(20, 20, 20, 0.92);
             }
+
             .audio-popover {
                 background: rgba(12, 12, 12, 0.97);
             }
+
             .audio-mute-track {
                 background: rgba(20, 20, 20, 0.92);
+            }
+
+            /* Glassmorphism fallbacks — opaque dark surface when blur unavailable */
+            .quotes-btn,
+            .streak-btn,
+            .streak-back {
+                background: rgba(15, 15, 15, 0.88);
+            }
+
+            .stat-card {
+                background: rgba(20, 20, 20, 0.85);
             }
         }
 
@@ -1509,8 +2084,13 @@
 
             /* Pull the home title down so the screen isn't a giant void
                between the title and the Begin button. */
-            #s1 h1 { margin-top: 14vh !important; }
-            #s2 h2 { margin-top: 6vh !important; }
+            #s1 h1 {
+                margin-top: 14vh !important;
+            }
+
+            #s2 h2 {
+                margin-top: 6vh !important;
+            }
 
             .picker-wrapper {
                 height: 42vh;
@@ -1555,21 +2135,47 @@
             .streak-screen {
                 padding: 5vh 2rem calc(max(env(safe-area-inset-bottom, 18px), 18px) + 70px);
             }
+
             .streak-quote {
                 font-size: 1.15rem;
                 max-width: 72%;
                 margin: 3vh 0 2vh;
             }
-            .streak-counter { margin: 1rem 0 0.5rem; }
-            .streak-number { font-size: clamp(4rem, 11vw, 5.5rem); }
-            .streak-stats { max-width: 540px; }
-            .stat-value { font-size: clamp(1.4rem, 4vw, 1.7rem); }
-            .chart-section { margin: 2rem auto 1.5rem; max-width: 540px; }
-            .chart-container { height: 140px; }
-            .heatmap-section { margin: 2rem auto 1rem; }
+
+            .streak-counter {
+                margin: 1rem 0 0.5rem;
+            }
+
+            .streak-number {
+                font-size: clamp(4rem, 11vw, 5.5rem);
+            }
+
+            .streak-stats {
+                max-width: 540px;
+            }
+
+            .stat-value {
+                font-size: clamp(1.4rem, 4vw, 1.7rem);
+            }
+
+            .chart-section {
+                margin: 2rem auto 1.5rem;
+                max-width: 540px;
+            }
+
+            .chart-container {
+                height: 140px;
+            }
+
+            .heatmap-section {
+                margin: 2rem auto 1rem;
+            }
 
             /* Quotes feed — generous breathing room for tap-to-scroll */
-            .quotes-feed-item { font-size: 1.1rem; }
+            .quotes-feed-item {
+                font-size: 1.4rem;
+                padding: 1.4rem 2.6rem;
+            }
         }
 
         /* Landscape tablets — iPad Mini (1133×744), iPad (1180×820),
@@ -1594,8 +2200,13 @@
                 margin-bottom: 1.4rem;
             }
 
-            #s1 h1 { margin-top: 10vh !important; }
-            #s2 h2 { margin-top: 3vh !important; }
+            #s1 h1 {
+                margin-top: 10vh !important;
+            }
+
+            #s2 h2 {
+                margin-top: 3vh !important;
+            }
 
             .picker-wrapper {
                 height: 50vh;
@@ -1649,32 +2260,98 @@
             .streak-screen {
                 padding: 3.5vh 1.6rem calc(max(env(safe-area-inset-bottom, 14px), 14px) + 80px);
             }
+
             .streak-quote {
                 font-size: 1rem;
                 margin: 1.6vh 0 1.2vh;
                 max-width: 80%;
             }
-            .streak-counter { margin: 0.4rem 0 0.2rem; }
-            .streak-number { font-size: clamp(3rem, 7.5vw, 4.5rem); }
-            .streak-label { font-size: 0.85rem; }
-            .streak-stats { max-width: 520px; margin: 0.8rem auto 0.3rem; gap: 0.55rem; }
-            .stat-card { padding: 0.7rem 0.5rem 0.55rem; }
-            .stat-value { font-size: clamp(1.2rem, 3.2vw, 1.5rem); }
-            .chart-section { margin: 1.2rem auto 0.6rem; max-width: 520px; }
-            .chart-title { margin-bottom: 0.5rem; }
-            .chart-container { height: 100px; }
-            .heatmap-section { margin: 0.8rem auto 0.3rem; }
+
+            .streak-counter {
+                margin: 0.4rem 0 0.2rem;
+            }
+
+            .streak-number {
+                font-size: clamp(3rem, 7.5vw, 4.5rem);
+            }
+
+            .streak-label {
+                font-size: 0.85rem;
+            }
+
+            .streak-stats {
+                max-width: 520px;
+                margin: 0.8rem auto 0.3rem;
+                gap: 0.55rem;
+            }
+
+            .stat-card {
+                padding: 0.7rem 0.5rem 0.55rem;
+            }
+
+            .stat-value {
+                font-size: clamp(1.2rem, 3.2vw, 1.5rem);
+            }
+
+            .chart-section {
+                margin: 1.2rem auto 0.6rem;
+                max-width: 520px;
+            }
+
+            .chart-title {
+                margin-bottom: 0.5rem;
+            }
+
+            .chart-container {
+                height: 100px;
+            }
+
+            .heatmap-section {
+                margin: 0.8rem auto 0.3rem;
+            }
 
             /* Quotes feed — leave room for the audio button at the bottom */
             .quotes-screen {
                 padding-bottom: calc(max(env(safe-area-inset-bottom, 14px), 14px) + 80px);
             }
-            .quotes-feed-item { font-size: 1.05rem; padding: 1.2rem 0; }
+
+            .quotes-feed-item {
+                font-size: 1.25rem;
+                padding: 1.2rem 2.4rem;
+            }
+
+            /* iPad in landscape gets a wider tab bar so finger reach feels
+               natural with a hand on either side of the device. */
+            .quotes-tabs {
+                margin: 0.6rem auto 1rem;
+                padding: 5px;
+            }
+
+            .quotes-tab {
+                font-size: 0.92rem;
+                padding: 0.6rem 1.5rem;
+            }
         }
 
         /* ===== MOBILE ONLY (phones) ===== */
         /* Desktop remain completely untouched */
         @media screen and (max-width: 600px) {
+
+            /* Ease the cost of the heavier backdrop-filter values on
+               low-end Android. Tablets and desktop GPUs aren't hurting,
+               but a Pixel 5a will drop frames during the panel fade if
+               every layer is composited through a 22-24px blur. The
+               visual difference at 14-16px is imperceptible on the small
+               viewport. */
+            .audio-popover {
+                backdrop-filter: blur(16px) saturate(140%);
+                -webkit-backdrop-filter: blur(16px) saturate(140%);
+            }
+
+            .confirm-dialog {
+                backdrop-filter: blur(14px) saturate(140%);
+                -webkit-backdrop-filter: blur(14px) saturate(140%);
+            }
 
             /* General mobile portrait adjustments covering Samsungs, Pixels, iPhones */
             h1 {
@@ -1744,18 +2421,18 @@
             .quotes-btn {
                 top: max(env(safe-area-inset-top, 8px), 8px);
                 left: 12px;
-                padding: 0.55rem 0.95rem;
-                font-size: 0.8rem;
-                min-height: 40px;
+                padding: 0.65rem 1.05rem;
+                font-size: 0.85rem;
+                min-height: 44px;
             }
 
             /* Streak button */
             .streak-btn {
                 top: max(env(safe-area-inset-top, 8px), 8px);
                 right: 12px;
-                padding: 0.55rem 0.95rem;
-                font-size: 0.8rem;
-                min-height: 40px;
+                padding: 0.65rem 1.05rem;
+                font-size: 0.85rem;
+                min-height: 44px;
             }
 
             .streak-btn svg {
@@ -1772,9 +2449,9 @@
             .streak-back {
                 top: max(env(safe-area-inset-top, 8px), 8px);
                 left: 12px;
-                padding: 0.55rem 0.95rem;
-                font-size: 0.8rem;
-                min-height: 40px;
+                padding: 0.65rem 1.05rem;
+                font-size: 0.85rem;
+                min-height: 44px;
             }
 
             .streak-quote {
@@ -1884,11 +2561,13 @@
             .audio-control {
                 bottom: max(env(safe-area-inset-bottom, 14px), 14px);
             }
+
             .audio-btn {
                 padding: 0.6rem 0.95rem;
                 font-size: 0.78rem;
                 min-height: 42px;
             }
+
             /* Match the rail to the audio button's footprint on phones —
                same width and height as the button so they merge cleanly
                at full drag. */
@@ -2114,11 +2793,13 @@
             .audio-control {
                 bottom: max(env(safe-area-inset-bottom, 8px), 8px);
             }
+
             .audio-btn {
                 padding: 0.4rem 0.75rem;
                 font-size: 0.72rem;
                 min-height: 32px;
             }
+
             /* Match the button's smaller landscape height so the button
                covers the rail flush at full drag. */
             .audio-mute-track {
@@ -2277,8 +2958,13 @@
             transform: translate(-50%, calc(-50% + 24px)) scale(0.8);
             opacity: 0;
             filter: blur(4px);
-            background: rgba(20, 20, 20, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            /* Subtle frosted dialog — slightly translucent so the dimmed
+               backdrop bleeds through, with backdrop-filter doing the
+               heavy lifting where supported. */
+            background: rgba(22, 22, 22, 0.78);
+            backdrop-filter: blur(var(--glass-blur-strong)) saturate(140%);
+            -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(140%);
+            border: 1px solid var(--glass-border-strong);
             border-radius: 1.2rem;
             padding: 1.5rem 1.4rem 1.2rem;
             width: min(360px, calc(100vw - 32px));
@@ -2306,6 +2992,7 @@
                 opacity: 0;
                 transform: translateY(12px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -2357,6 +3044,86 @@
             gap: 0.55rem;
         }
 
+        /* Frequency picker inside the notification pre-prompt. Plain <select>
+           so each platform renders its native picker (iOS wheel, Android
+           bottom sheet, desktop dropdown) — uniformly accessible and keyboard
+           friendly without a custom listbox implementation. */
+        .notif-freq-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            margin: 0 0 1.1rem;
+            text-align: left;
+        }
+
+        .notif-freq-label {
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.55);
+            padding-left: 0.2rem;
+        }
+
+        .notif-freq-select-wrap {
+            position: relative;
+        }
+
+        .notif-freq-select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            width: 100%;
+            min-height: 48px;
+            padding: 0.75rem 2.4rem 0.75rem 1rem;
+            border-radius: 0.9rem;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--fg);
+            border: 1px solid var(--hairline);
+            font-family: inherit;
+            /* 16px floor on touch — iOS Safari auto-zooms any <select>
+               or <input> rendered smaller than that on focus, which
+               throws the whole modal off-screen. */
+            font-size: 16px;
+            font-weight: 500;
+            letter-spacing: 0.01em;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition:
+                background-color var(--dur-base) var(--ease-fluid),
+                border-color var(--dur-base) var(--ease-fluid),
+                box-shadow var(--dur-base) var(--ease-fluid);
+        }
+
+        .notif-freq-select:focus,
+        .notif-freq-select:focus-visible {
+            outline: none;
+            border-color: var(--hairline-strong);
+            box-shadow: 0 0 0 2px var(--success-soft);
+        }
+
+        .notif-freq-select option {
+            background: #1a1a1a;
+            color: var(--fg);
+        }
+
+        .notif-freq-chevron {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255, 255, 255, 0.55);
+            font-size: 0.85rem;
+            pointer-events: none;
+        }
+
+        /* Bump the staggered reveal so the dropdown also slides in instead
+           of popping into a half-animated dialog. */
+        .confirm-modal.open .notif-freq-wrap {
+            animation: confirmContentIn 0.42s var(--ease-spring) 0.20s both;
+        }
+
         .confirm-btn {
             position: relative;
             width: 100%;
@@ -2403,6 +3170,7 @@
                     0 12px 28px rgba(255, 255, 255, 0.14),
                     0 0 0 1px rgba(255, 255, 255, 0.35);
             }
+
             .confirm-btn-secondary:hover {
                 background: var(--surface-3);
                 color: #fff;
@@ -2445,6 +3213,25 @@
             .quotes-feed-item {
                 animation: none;
                 opacity: 1;
+            }
+
+            /* Strip the directional slide + blur from the tab swap and the
+               indicator glide — keep the opacity change so users still get
+               a clear "something changed" cue. */
+            .quotes-feed,
+            .quotes-feed.is-leaving,
+            .quotes-feed.is-entering {
+                transform: none !important;
+                filter: none !important;
+                transition: opacity 0.2s ease !important;
+            }
+
+            .quotes-feed.is-switched .quotes-feed-item {
+                animation: none;
+            }
+
+            .quotes-tabs-indicator {
+                transition: opacity 0.2s ease !important;
             }
 
             .chart-bar {
@@ -2493,6 +3280,7 @@
 
             .screen {
                 transition: opacity 0.15s ease;
+                transform: none !important;
             }
 
             .end-session-btn {
@@ -2547,8 +3335,8 @@
                 </svg>
                 <span>off</span>
             </div>
-            <svg class="audio-mute-track-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="audio-mute-track-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="15 18 9 12 15 6" />
             </svg>
         </div>
@@ -2565,12 +3353,11 @@
         </button>
     </div>
 
-    <div class="audio-popover" id="audioPopover" role="dialog" aria-modal="true"
-        aria-label="Ambient sound picker" aria-hidden="true">
+    <div class="audio-popover" id="audioPopover" role="dialog" aria-modal="true" aria-label="Ambient sound picker"
+        aria-hidden="true">
         <div class="audio-volume">
-            <svg class="audio-volume-icon" id="audioVolumeIcon" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                aria-hidden="true">
+            <svg class="audio-volume-icon" id="audioVolumeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M11 5L6 9H2v6h4l5 4V5z" />
                 <!-- Sound waves: visible when volume > 0. Same stack as the audio
                      button so both icons read identically across the app. -->
@@ -2644,6 +3431,13 @@
     <div id="quotesScreen" class="screen quotes-screen" inert>
         <button class="streak-back" onclick="closeQuotes()">&larr; Back</button>
         <h2 style="margin-top: 5vh; text-align: center;">Quotes</h2>
+        <div class="quotes-tabs" id="quotesTabs" role="tablist" aria-label="Quote views">
+            <span class="quotes-tabs-indicator" id="quotesTabsIndicator" aria-hidden="true"></span>
+            <button class="quotes-tab active" id="quotesTabAll" type="button" role="tab"
+                aria-selected="true" onclick="setQuotesView('all')">Discover</button>
+            <button class="quotes-tab" id="quotesTabFav" type="button" role="tab"
+                aria-selected="false" onclick="setQuotesView('favorites')">Favorites</button>
+        </div>
         <div class="quotes-feed" id="quotesFeed"></div>
     </div>
 
@@ -2660,16 +3454,16 @@
         </div>
         <div class="streak-stats" id="streakStats">
             <div class="stat-card" id="statCardLongest">
-                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                 </svg>
                 <div class="stat-value" id="statLongest">0</div>
                 <div class="stat-label">Longest</div>
             </div>
             <div class="stat-card" id="statCardSessions">
-                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="9" />
                     <path d="m8.5 12 2.5 2.5L15.5 10" />
                 </svg>
@@ -2677,8 +3471,8 @@
                 <div class="stat-label">Sessions</div>
             </div>
             <div class="stat-card" id="statCardTime">
-                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="9" />
                     <path d="M12 7v5l3.5 2" />
                 </svg>
@@ -2722,17 +3516,29 @@
          we explain the value in our own UI before triggering the native
          OS prompt, which protects the grant rate (a denied browser-level
          permission can only be reset by the user via browser settings). -->
-    <div class="confirm-modal" id="notifPromptModal" role="dialog" aria-modal="true"
-        aria-labelledby="notifPromptTitle" aria-describedby="notifPromptBody" aria-hidden="true" inert>
+    <div class="confirm-modal" id="notifPromptModal" role="dialog" aria-modal="true" aria-labelledby="notifPromptTitle"
+        aria-describedby="notifPromptBody" aria-hidden="true" inert>
         <div class="confirm-backdrop" id="notifPromptBackdrop"></div>
         <div class="confirm-dialog" role="document">
-            <h3 class="confirm-title" id="notifPromptTitle">Weekly reminders?</h3>
+            <h3 class="confirm-title" id="notifPromptTitle">Breath reminders</h3>
             <p class="confirm-body" id="notifPromptBody">
-                ZenBreath can nudge you once a week to take a few breaths. You can change this any time in your browser settings.
+                ZenBreath can nudge you to take a few breaths. Pick how often — you can change this any time.
             </p>
+            <div class="notif-freq-wrap" id="notifFreqWrap">
+                <label class="notif-freq-label" for="notifFreqSelect">Remind me</label>
+                <div class="notif-freq-select-wrap">
+                    <select class="notif-freq-select" id="notifFreqSelect" aria-label="Reminder frequency">
+                        <option value="daily">Every day</option>
+                        <option value="every2">Every 2 days</option>
+                        <option value="weekly" selected>Every week</option>
+                        <option value="off">Don't remind me</option>
+                    </select>
+                    <span class="notif-freq-chevron" aria-hidden="true">▾</span>
+                </div>
+            </div>
             <div class="confirm-actions">
-                <button class="confirm-btn confirm-btn-primary" id="notifPromptYes" type="button">Yes, remind me</button>
-                <button class="confirm-btn confirm-btn-secondary" id="notifPromptNo" type="button">No thanks</button>
+                <button class="confirm-btn confirm-btn-primary" id="notifPromptYes" type="button">Save</button>
+                <button class="confirm-btn confirm-btn-secondary" id="notifPromptNo" type="button">Not now</button>
             </div>
         </div>
     </div>
@@ -2740,8 +3546,8 @@
     <!-- End-session confirmation. Hosts both the dimming backdrop and the
          centered dialog. `inert` blocks tab-stops + screen reader access
          while closed, and is removed when openEndConfirm() runs. -->
-    <div class="confirm-modal" id="endConfirmModal" role="dialog" aria-modal="true"
-        aria-labelledby="endConfirmTitle" aria-describedby="endConfirmBody" aria-hidden="true" inert>
+    <div class="confirm-modal" id="endConfirmModal" role="dialog" aria-modal="true" aria-labelledby="endConfirmTitle"
+        aria-describedby="endConfirmBody" aria-hidden="true" inert>
         <div class="confirm-backdrop" id="endConfirmBackdrop"></div>
         <div class="confirm-dialog" role="document">
             <h3 class="confirm-title" id="endConfirmTitle">End session early?</h3>
@@ -2750,7 +3556,8 @@
                 <div class="confirm-progress-fill" id="endConfirmProgressFill"></div>
             </div>
             <div class="confirm-actions">
-                <button class="confirm-btn confirm-btn-primary" id="endConfirmKeep" type="button">Keep breathing</button>
+                <button class="confirm-btn confirm-btn-primary" id="endConfirmKeep" type="button">Keep
+                    breathing</button>
                 <button class="confirm-btn confirm-btn-secondary" id="endConfirmEnd" type="button">End session</button>
             </div>
         </div>
@@ -3385,17 +4192,128 @@
         }
 
         const quotesFeedEl = document.getElementById('quotesFeed');
+        const quotesTabsEl = document.getElementById('quotesTabs');
+        const quotesTabsIndicatorEl = document.getElementById('quotesTabsIndicator');
+        const quotesTabAllEl = document.getElementById('quotesTabAll');
+        const quotesTabFavEl = document.getElementById('quotesTabFav');
+
+        /* --- Favorite quotes ---
+           Stored as a Set-backed array of full quote strings rather than
+           indices, because the curated list can grow over time and we
+           don't want a future re-order to silently re-bind a user's heart
+           to a different quote. Persistence is best-effort via the shared
+           storageSetJSON helper. */
+        const FAV_QUOTES_KEY = 'zen_fav_quotes';
+        let favoriteQuotes = new Set();
+        let quotesView = 'all'; // 'all' | 'favorites'
+
+        function loadFavoriteQuotes() {
+            const arr = storageGetJSON(FAV_QUOTES_KEY, []);
+            favoriteQuotes = new Set(Array.isArray(arr) ? arr : []);
+        }
+        function saveFavoriteQuotes() {
+            storageSetJSON(FAV_QUOTES_KEY, Array.from(favoriteQuotes));
+        }
+        function isQuoteFavorited(text) {
+            return favoriteQuotes.has(text);
+        }
+        function applyHeartLabels(btn, saved) {
+            if (!btn) return;
+            const tip = saved ? 'Unfavorite' : 'Favorite';
+            const aria = saved
+                ? 'Remove quote from favorites'
+                : 'Save quote to favorites';
+            btn.setAttribute('aria-pressed', saved ? 'true' : 'false');
+            btn.setAttribute('aria-label', aria);
+            btn.setAttribute('data-tooltip', tip);
+            // Native title for touch long-press + screen readers that
+            // surface it. Lower-priority than aria-label, which AT prefers.
+            btn.setAttribute('title', tip);
+        }
+
+        function toggleQuoteFavorite(text, btn) {
+            if (favoriteQuotes.has(text)) {
+                favoriteQuotes.delete(text);
+                if (btn) {
+                    btn.classList.remove('saved');
+                    applyHeartLabels(btn, false);
+                }
+            } else {
+                favoriteQuotes.add(text);
+                if (btn) {
+                    btn.classList.add('saved');
+                    applyHeartLabels(btn, true);
+                }
+                // Tiny haptic confirmation on supporting devices.
+                try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { }
+            }
+            saveFavoriteQuotes();
+            // If we're viewing favorites and the user just un-saved one,
+            // pull it out of view rather than leaving an orphaned card.
+            if (quotesView === 'favorites' && btn) {
+                const item = btn.closest('.quotes-feed-item');
+                if (item && !favoriteQuotes.has(text)) {
+                    item.style.transition = 'opacity 0.3s var(--ease-fluid)';
+                    item.style.opacity = '0';
+                    setTimeout(() => {
+                        item.remove();
+                        if (!quotesFeedEl.querySelector('.quotes-feed-item')) {
+                            renderQuotesFeed();
+                        }
+                    }, 280);
+                }
+            }
+        }
+
+        // SVG heart with both filled & outlined states swapped via CSS.
+        function buildHeartButton(text) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'quote-heart';
+            const saved = isQuoteFavorited(text);
+            if (saved) btn.classList.add('saved');
+            applyHeartLabels(btn, saved);
+            btn.innerHTML =
+                '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+                '<path d="M12 21s-7.5-4.6-9.6-9.1C1 8.8 2.7 5.6 5.8 5c2-.4 3.9.5 5 2 1.1-1.5 3-2.4 5-2 ' +
+                '3.1.6 4.8 3.8 3.4 6.9C19.5 16.4 12 21 12 21Z"/></svg>';
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                toggleQuoteFavorite(text, btn);
+            });
+            return btn;
+        }
 
         function renderQuotesFeed() {
             quotesFeedEl.textContent = '';
-            const count = Math.min(positiveQuotesLength, 120);
-            const indices = pickKRandomIndices(positiveQuotesLength, count);
             const frag = document.createDocumentFragment();
-            for (let i = 0; i < indices.length; i++) {
+            let texts;
+            if (quotesView === 'favorites') {
+                texts = Array.from(favoriteQuotes);
+                if (texts.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'quotes-empty';
+                    empty.textContent = 'No favorites yet. Tap the heart on any quote to save it here.';
+                    frag.appendChild(empty);
+                    quotesFeedEl.appendChild(frag);
+                    quotesScreenEl.scrollTop = 0;
+                    return;
+                }
+            } else {
+                const count = Math.min(positiveQuotesLength, 120);
+                const indices = pickKRandomIndices(positiveQuotesLength, count);
+                texts = indices.map(getPositiveQuote);
+            }
+            for (let i = 0; i < texts.length; i++) {
+                const text = texts[i];
                 const div = document.createElement('div');
                 div.className = 'quotes-feed-item';
+                const span = document.createElement('span');
                 // Curated quotes already include their own quotation marks + attribution.
-                div.textContent = getPositiveQuote(indices[i]);
+                span.textContent = text;
+                div.appendChild(span);
+                div.appendChild(buildHeartButton(text));
                 // Cap stagger so the entire feed has finished animating well before
                 // the user can scroll far — avoids running animations during scroll.
                 const delay = i < 30 ? i * 0.025 : 0.75;
@@ -3406,13 +4324,125 @@
             quotesScreenEl.scrollTop = 0;
         }
 
+        // Move the sliding pill to sit over whichever tab is active. We
+        // measure offsets from the tab bar's content-box (not viewport)
+        // so the math holds inside any responsive layout — phones, iPad
+        // split view, desktop — without per-breakpoint constants.
+        function positionQuotesTabsIndicator(animate) {
+            if (!quotesTabsEl || !quotesTabsIndicatorEl) return;
+            const target = quotesView === 'favorites' ? quotesTabFavEl : quotesTabAllEl;
+            if (!target) return;
+            const parentRect = quotesTabsEl.getBoundingClientRect();
+            const rect = target.getBoundingClientRect();
+            if (!rect.width) {
+                // Element isn't laid out yet (panel just opened with display
+                // changes). Try again on the next frame instead of writing
+                // bogus zeros that would briefly hide the pill.
+                requestAnimationFrame(() => positionQuotesTabsIndicator(animate));
+                return;
+            }
+            // Subtract the bar's left padding so the indicator's `top: 4px`
+            // reference aligns horizontally with the rendered tab.
+            const x = rect.left - parentRect.left;
+            if (!animate) {
+                // First placement: kill the transition for one frame so the
+                // pill doesn't visibly fly in from x=0.
+                const prev = quotesTabsIndicatorEl.style.transition;
+                quotesTabsIndicatorEl.style.transition = 'none';
+                quotesTabsEl.style.setProperty('--qtabs-w', rect.width + 'px');
+                quotesTabsEl.style.setProperty('--qtabs-x', x + 'px');
+                // Force a reflow then restore the transition string.
+                // eslint-disable-next-line no-unused-expressions
+                quotesTabsIndicatorEl.offsetHeight;
+                quotesTabsIndicatorEl.style.transition = prev;
+            } else {
+                quotesTabsEl.style.setProperty('--qtabs-w', rect.width + 'px');
+                quotesTabsEl.style.setProperty('--qtabs-x', x + 'px');
+            }
+            quotesTabsIndicatorEl.classList.add('ready');
+        }
+
+        // Re-place the indicator on resize / orientation change so the pill
+        // doesn't end up behind the wrong tab on iPad rotation or when the
+        // mobile keyboard collapses.
+        window.addEventListener('resize', () => {
+            if (quotesScreenEl && quotesScreenEl.classList.contains('active')) {
+                positionQuotesTabsIndicator(false);
+            }
+        });
+        window.addEventListener('orientationchange', () => {
+            if (quotesScreenEl && quotesScreenEl.classList.contains('active')) {
+                // Layout is in flux for a moment after orientation flips;
+                // wait one frame to read stable rects.
+                requestAnimationFrame(() => positionQuotesTabsIndicator(false));
+            }
+        });
+
+        // Directional cross-fade. Duration is deliberately longer than a
+        // snappy 200ms so the swap reads as one continuous gesture, but
+        // capped at 360ms so the user is never waiting on UI to catch up.
+        let quotesSwitchTimer = null;
+        const TAB_ORDER = ['all', 'favorites'];
+        function setQuotesView(view) {
+            if (view !== 'favorites') view = 'all';
+            if (view === quotesView) return;
+            const prevView = quotesView;
+            const direction = TAB_ORDER.indexOf(view) - TAB_ORDER.indexOf(prevView);
+            quotesView = view;
+            const showFav = view === 'favorites';
+            quotesTabAllEl.classList.toggle('active', !showFav);
+            quotesTabFavEl.classList.toggle('active', showFav);
+            quotesTabAllEl.setAttribute('aria-selected', String(!showFav));
+            quotesTabFavEl.setAttribute('aria-selected', String(showFav));
+
+            // Slide the indicator pill — it animates on its own via CSS.
+            positionQuotesTabsIndicator(true);
+
+            // Set the direction CSS var so the feed knows which side to
+            // exit toward and where the new content should slide in from.
+            quotesFeedEl.style.setProperty('--qfeed-dir', String(direction));
+
+            if (quotesSwitchTimer) {
+                clearTimeout(quotesSwitchTimer);
+                quotesSwitchTimer = null;
+            }
+            // Phase 1: leave. Apply the leaving state and wait for it to
+            // complete before swapping DOM — keeps the user from glimpsing
+            // the new content layered on top of the old.
+            quotesFeedEl.classList.remove('is-switched', 'is-entering');
+            quotesFeedEl.classList.add('is-leaving');
+            quotesSwitchTimer = setTimeout(() => {
+                // Phase 2: swap content while parked off-axis on the entry
+                // side. is-entering disables the transition so the teleport
+                // is instant; the next frame removes both is-leaving and
+                // is-entering, and the CSS transition glides the feed back.
+                quotesFeedEl.classList.remove('is-leaving');
+                quotesFeedEl.classList.add('is-entering');
+                renderQuotesFeed();
+                // Two RAFs: one for the browser to commit the parked state,
+                // one for it to register the transition target as a change.
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        quotesFeedEl.classList.remove('is-entering');
+                        quotesFeedEl.classList.add('is-switched');
+                    });
+                });
+                quotesSwitchTimer = null;
+            }, 300);
+        }
+
         function openQuotes() {
             const activeScreen = document.querySelector('.screen.active');
             if (activeScreen && activeScreen.id !== 'quotesScreen') previousScreen = activeScreen.id;
             nav('quotesScreen');
             quotesBtnEl.style.display = 'none';
             streakBtnEl.style.display = 'none';
+            loadFavoriteQuotes();
             renderQuotesFeed();
+            // Place the indicator under whichever tab is active on open.
+            // RAF gives the panel a chance to lay out — sizes read 0 in
+            // the same tick a `display` change is applied.
+            requestAnimationFrame(() => positionQuotesTabsIndicator(false));
         }
 
         function closeQuotes() {
@@ -4103,7 +5133,7 @@
                 // scroll / other pointer interpreters can take over cleanly.
                 if (Math.abs(dy) > 18 && Math.abs(dy) > Math.abs(dx) * 1.4) {
                     clearHoldTimer();
-                    try { audioBtnEl.releasePointerCapture(e.pointerId); } catch (err) {}
+                    try { audioBtnEl.releasePointerCapture(e.pointerId); } catch (err) { }
                     resetMuteUI();
                     holdState = null;
                     return;
@@ -4127,7 +5157,7 @@
             const wasArmed = holdState.armed;
             const wasHinted = holdState.hintShown;
 
-            try { audioBtnEl.releasePointerCapture(e.pointerId); } catch (err) {}
+            try { audioBtnEl.releasePointerCapture(e.pointerId); } catch (err) { }
             clearHoldTimer();
             resetMuteUI();
             holdState = null;
@@ -4435,21 +5465,41 @@
 
             let textFaded = false;
             let lastBreatheText = '';
+            // Track the current breath phase independently of the visible
+            // label so we can keep emitting gentle haptics for the entire
+            // session, even after the on-screen text fades. The "phase"
+            // string drives both the label and the buzz; comparing against
+            // lastPhase ensures we only fire one pulse per transition.
+            let lastPhase = '';
             function loop(now) {
                 if (!isSessionActive || !s34El.classList.contains('active')) return;
 
                 const elapsed = now - start;
+                const p = elapsed % 12000;
+                let phase;
+                if (p < 4500) phase = 'Inhale';
+                else if (p < 6000) phase = 'Hold';
+                else if (p < 10500) phase = 'Exhale';
+                else phase = 'Hold';
+
+                if (phase !== lastPhase) {
+                    lastPhase = phase;
+                    // Gentle haptic on every Inhale / Hold / Exhale boundary.
+                    // navigator.vibrate is supported on Android Chrome, Firefox
+                    // and Samsung Internet; iOS Safari ignores it silently,
+                    // which is fine (Apple gates the haptics API to native).
+                    if (navigator.vibrate) {
+                        try {
+                            if (phase === 'Inhale' || phase === 'Exhale') navigator.vibrate(18);
+                            else navigator.vibrate(10); // softer for Hold
+                        } catch (e) { }
+                    }
+                }
 
                 if (!textFaded && elapsed < 26000) {
-                    const p = elapsed % 12000;
-                    let target;
-                    if (p < 4500) target = 'Inhale';
-                    else if (p < 6000) target = 'Hold';
-                    else if (p < 10500) target = 'Exhale';
-                    else target = 'Hold';
-                    if (target !== lastBreatheText) {
-                        breatheText.textContent = target;
-                        lastBreatheText = target;
+                    if (phase !== lastBreatheText) {
+                        breatheText.textContent = phase;
+                        lastBreatheText = phase;
                     }
                 } else if (!textFaded) {
                     breatheText.style.opacity = '0';
@@ -4789,8 +5839,20 @@
 
         const REMINDER_URL = 'https://leolynbrook.github.io/Meditation-Website/';
         const NOTIF_PREF_KEY = 'zen_notif_pref';
+        const NOTIF_FREQ_KEY = 'zen_notif_freq';
         const PBS_TAG = 'weekly-meditation-reminder';
-        const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+        const DAY_MS = 24 * 60 * 60 * 1000;
+        const WEEK_MS = 7 * DAY_MS;
+
+        // Frequency catalog. Keys persist in localStorage and are forwarded
+        // to the service worker so its gating cadence matches the user's
+        // choice. minInterval is what we pass to Periodic Background Sync —
+        // the browser may fire less often, but it won't fire more often.
+        const NOTIF_FREQS = {
+            daily:   { intervalMs: DAY_MS,      label: 'Every day'    },
+            every2:  { intervalMs: 2 * DAY_MS,  label: 'Every 2 days' },
+            weekly:  { intervalMs: WEEK_MS,     label: 'Every week'   }
+        };
 
         const notifPromptModal = document.getElementById('notifPromptModal');
         const notifPromptBackdrop = document.getElementById('notifPromptBackdrop');
@@ -4798,6 +5860,8 @@
         const notifPromptBodyEl = document.getElementById('notifPromptBody');
         const notifPromptYesBtn = document.getElementById('notifPromptYes');
         const notifPromptNoBtn = document.getElementById('notifPromptNo');
+        const notifFreqWrapEl = document.getElementById('notifFreqWrap');
+        const notifFreqSelectEl = document.getElementById('notifFreqSelect');
 
         let notifPromptOpen = false;
         let notifPromptReturnFocus = null;
@@ -4823,17 +5887,29 @@
             if (notifPromptMode === 'ios-install') {
                 notifPromptTitleEl.textContent = 'Add ZenBreath to your Home Screen';
                 notifPromptBodyEl.textContent =
-                    'Weekly reminders on iPhone and iPad require ZenBreath to be installed. ' +
+                    'Reminders on iPhone and iPad require ZenBreath to be installed. ' +
                     'Tap the Share button and choose "Add to Home Screen", then open ZenBreath from your Home Screen to enable them.';
                 notifPromptYesBtn.textContent = 'Got it';
                 notifPromptNoBtn.style.display = 'none';
+                if (notifFreqWrapEl) notifFreqWrapEl.style.display = 'none';
             } else {
-                notifPromptTitleEl.textContent = 'Weekly reminders?';
+                notifPromptTitleEl.textContent = 'Breath reminders';
                 notifPromptBodyEl.textContent =
-                    'ZenBreath can nudge you once a week to take a few breaths. You can change this any time in your browser settings.';
-                notifPromptYesBtn.textContent = 'Yes, remind me';
-                notifPromptNoBtn.textContent = 'No thanks';
+                    'ZenBreath can nudge you to take a few breaths. Pick how often — you can change this any time.';
+                notifPromptYesBtn.textContent = 'Save';
+                notifPromptNoBtn.textContent = 'Not now';
                 notifPromptNoBtn.style.display = '';
+                if (notifFreqWrapEl) notifFreqWrapEl.style.display = '';
+                // Restore the last choice so reopening the prompt feels
+                // like a real settings panel and not a fresh ask.
+                const savedFreq = storageGet(NOTIF_FREQ_KEY, '');
+                if (notifFreqSelectEl) {
+                    if (savedFreq && (savedFreq === 'off' || NOTIF_FREQS[savedFreq])) {
+                        notifFreqSelectEl.value = savedFreq;
+                    } else {
+                        notifFreqSelectEl.value = 'weekly';
+                    }
+                }
             }
 
             notifPromptModal.removeAttribute('inert');
@@ -4871,7 +5947,37 @@
             });
         }
 
-        async function registerPeriodicSync() {
+        function getFreqIntervalMs(freq) {
+            const entry = NOTIF_FREQS[freq];
+            return entry ? entry.intervalMs : WEEK_MS;
+        }
+
+        // Tell the worker which cadence to gate on. Cross-platform: the SW
+        // also persists this so the periodicsync handler — which can fire
+        // without an active page — uses the right interval.
+        async function sendFreqToSW(intervalMs) {
+            if (!('serviceWorker' in navigator)) return;
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                if (reg.active) {
+                    reg.active.postMessage({
+                        type: 'set-reminder-interval',
+                        intervalMs: intervalMs
+                    });
+                }
+            } catch (e) { }
+        }
+
+        async function unregisterPeriodicSync() {
+            if (!('serviceWorker' in navigator)) return;
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                if (!('periodicSync' in reg)) return;
+                try { await reg.periodicSync.unregister(PBS_TAG); } catch (e) { }
+            } catch (e) { }
+        }
+
+        async function registerPeriodicSync(intervalMs) {
             if (!('serviceWorker' in navigator)) return;
             try {
                 const reg = await navigator.serviceWorker.ready;
@@ -4887,8 +5993,11 @@
                     pbsState = status.state;
                 } catch (e) { /* permission name unknown → assume granted */ }
                 if (pbsState !== 'granted') return;
+                // Re-register so a frequency change takes effect even if a
+                // prior registration already exists (the browser keys by tag).
+                try { await reg.periodicSync.unregister(PBS_TAG); } catch (e) { }
                 await reg.periodicSync.register(PBS_TAG, {
-                    minInterval: WEEK_MS
+                    minInterval: intervalMs || WEEK_MS
                 });
             } catch (e) {
                 // Site not installed as a PWA, no engagement score, or
@@ -4898,7 +6007,7 @@
             }
         }
 
-        async function enableNotifications() {
+        async function enableNotifications(freq) {
             if (!('Notification' in window)) {
                 storageSet(NOTIF_PREF_KEY, 'no');
                 return;
@@ -4913,12 +6022,25 @@
                 return;
             }
             storageSet(NOTIF_PREF_KEY, 'yes');
-            await registerPeriodicSync();
+            storageSet(NOTIF_FREQ_KEY, freq);
+            const intervalMs = getFreqIntervalMs(freq);
+            await sendFreqToSW(intervalMs);
+            await registerPeriodicSync(intervalMs);
+            // Best-effort catch-up so the user gets immediate confirmation
+            // that the channel works — the SW guard skips it if a recent
+            // reminder has already been shown.
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                if (reg.active) {
+                    reg.active.postMessage({ type: 'show-weekly-reminder' });
+                }
+            } catch (e) { }
         }
 
         notifPromptYesBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             const mode = notifPromptMode;
+            const chosen = notifFreqSelectEl ? notifFreqSelectEl.value : 'weekly';
             closeNotifPrompt();
             if (mode === 'ios-install') {
                 // Informational dialog only — persist 'no-ios' so we don't
@@ -4928,11 +6050,24 @@
                 storageSet(NOTIF_PREF_KEY, 'no-ios');
                 return;
             }
-            await enableNotifications();
+            if (chosen === 'off' || !NOTIF_FREQS[chosen]) {
+                // User affirmatively picked "don't remind me" — persist a
+                // hard no and unregister any prior schedule so a previously
+                // enabled cadence stops firing.
+                storageSet(NOTIF_PREF_KEY, 'no');
+                storageSet(NOTIF_FREQ_KEY, 'off');
+                await sendFreqToSW(0);
+                await unregisterPeriodicSync();
+                return;
+            }
+            await enableNotifications(chosen);
         });
 
         notifPromptNoBtn.addEventListener('click', (e) => {
             e.preventDefault();
+            // "Not now" — defer without recording an affirmative choice.
+            // We still persist 'no' so we don't badger the user every load;
+            // they can re-open the picker from the settings entry below.
             storageSet(NOTIF_PREF_KEY, 'no');
             closeNotifPrompt();
         });
@@ -5006,10 +6141,14 @@
                 // settings, OS focus mode). Refresh periodic sync only
                 // when the browser still reports granted.
                 if (hasNotificationAPI && Notification.permission === 'granted') {
-                    await registerPeriodicSync();
+                    const savedFreq = storageGet(NOTIF_FREQ_KEY, 'weekly');
+                    const intervalMs = getFreqIntervalMs(savedFreq);
+                    await sendFreqToSW(intervalMs);
+                    await registerPeriodicSync(intervalMs);
                     // Best-effort catch-up: ask the SW to render a reminder
-                    // if more than a week has passed since the last one,
-                    // covering platforms where PBS doesn't fire reliably.
+                    // if more than the chosen interval has passed since the
+                    // last one, covering platforms where PBS doesn't fire
+                    // reliably (iOS PWA, locked-down Chromium installs).
                     try {
                         const reg = await navigator.serviceWorker.ready;
                         if (reg.active) {
